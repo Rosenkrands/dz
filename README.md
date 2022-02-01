@@ -6,7 +6,8 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of dz is to …
+The goal of dz is to showcase algorithms developed to handle dynamic
+zoning applications for the team-orienteering problem.
 
 ## Installation
 
@@ -18,6 +19,18 @@ You can install the development version of dz from
 devtools::install_github("Rosenkrands/dz")
 ```
 
-## Example
+## Test instances
 
-The first example will be how to access test instances.
+There are 7 seven test instances included in the package. They can be
+accessed with `dz::test_instances`.
+
+``` r
+length(dz::test_instances)
+#> [1] 7
+```
+
+``` r
+plot(dz::test_instances$p1_tsiligirides)
+```
+
+<img src="man/figures/README-unnamed-chunk-3-1.png" width="100%" />

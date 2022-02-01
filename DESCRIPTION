@@ -13,3 +13,12 @@ BugReports: https://github.com/Rosenkrands/dz/issues
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+RoxygenNote: 7.1.2
+Imports: 
+    stringr,
+    dplyr,
+    tibble,
+    ggplot2
+Depends: 
+    R (>= 2.10)
+LazyData: true
