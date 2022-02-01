@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# dz
+# Dynamic Zoning
 
 <!-- badges: start -->
 `r badger::badge_lifecycle("experimental")` `r badger::badge_repostatus("Active")`
