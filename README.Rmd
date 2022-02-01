@@ -9,13 +9,15 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
   fig.path = "man/figures/README-",
-  out.width = "100%"
+  out.width = "100%",
+  dpi = 300
 )
 ```
 
 # dz
 
 <!-- badges: start -->
+`r badger::badge_lifecycle("experimental")` `r badger::badge_repostatus("Active")`
 <!-- badges: end -->
 
 The goal of dz is to showcase algorithms developed to handle dynamic zoning applications for the team-orienteering problem.
