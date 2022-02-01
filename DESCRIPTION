@@ -1,11 +1,15 @@
 Package: dz
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Dynamic Zoning
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Authors@R: 
+    person("Kasper", "Rosenkrands", , "krosen17@student.aau.dk", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-2196-4661"))
+Description: Impelementation of algorithms for project regarding dynamic zoning strategies.
+License: MIT + file LICENSE
 Encoding: UTF-8
-LazyData: true
+URL: https://github.com/Rosenkrands/dz
+BugReports: https://github.com/Rosenkrands/dz/issues
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
