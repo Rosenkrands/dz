@@ -41,13 +41,15 @@ instance <- function(path_to_file) {
 #' @export
 #'
 plot.instance <- function(inst, delaunay = FALSE, voronoi = FALSE) {
-  # print("this is plot.instance")
+  # Instantiate the ggplot object
   p <- ggplot2::ggplot()
 
+  # If either delaunay or voronoi is true we compute the triangulation
   if (delaunay | voronoi) {
     tri <- deldir::deldir(inst$points$x, inst$points$y)
   }
 
+  # Add delaunay edges
   if (delaunay) {
     p <- p +
       ggplot2::geom_segment(
@@ -57,6 +59,7 @@ plot.instance <- function(inst, delaunay = FALSE, voronoi = FALSE) {
       )
   }
 
+  # Add voronoi tiles
   if (voronoi) {
     p <- p +
       ggvoronoi::stat_voronoi(
@@ -66,6 +69,7 @@ plot.instance <- function(inst, delaunay = FALSE, voronoi = FALSE) {
       )
   }
 
+  # Add points and title to the plot
   p <- p +
     ggplot2::geom_point(
       data = inst$points |> dplyr::filter(point_type == "intermediate"),
