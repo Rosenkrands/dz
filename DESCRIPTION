@@ -19,7 +19,11 @@ Imports:
     dplyr,
     tibble,
     ggplot2,
-    Rcpp
+    Rcpp,
+    BH,
+    deldir,
+    ggvoronoi,
+    igraph
 Depends: 
     R (>= 2.10)
 LazyData: true

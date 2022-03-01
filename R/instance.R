@@ -17,7 +17,9 @@
 instance <- function(path_to_file) {
   points <- utils::read.table(path_to_file) |>
     tibble::tibble() |>
-    dplyr::rename(x = V1, y = V2, score = V3)
+    dplyr::rename(x = V1, y = V2, score = V3) |>
+    dplyr::mutate(id = dplyr::row_number(), .before = dplyr::everything(),
+                  point_type = ifelse(score == 0, "terminal", "intermediate"))
 
   n <- nrow(points)
 
@@ -36,10 +38,44 @@ instance <- function(path_to_file) {
 #' @return A ggplot object
 #' @export
 #'
-plot.instance <- function(inst) {
+plot.instance <- function(inst, delaunay = FALSE, voronoi = FALSE) {
   # print("this is plot.instance")
-  ggplot2::ggplot(data = inst$points) +
-    ggplot2::geom_point(ggplot2::aes(x, y, color = score)) +
-    ggplot2::ggtitle(paste0("instance: ", inst$name)) +
-    ggplot2::theme_bw()
+  p <- ggplot2::ggplot()
+
+  if (delaunay | voronoi) {
+    tri <- deldir::deldir(inst$points$x, inst$points$y)
+  }
+
+  if (delaunay) {
+    p <- p +
+      ggplot2::geom_segment(
+        data = tri$delsgs,
+        ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+        color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+      )
+  }
+
+  if (voronoi) {
+    p <- p +
+      ggvoronoi::stat_voronoi(
+        data = inst$points |> dplyr::distinct(x,y),
+        ggplot2::aes(x,y),
+        geom = "path", color = ggplot2::alpha("black", 0.5)
+      )
+  }
+
+  p <- p +
+    ggplot2::geom_point(
+      data = inst$points |> dplyr::filter(point_type == "intermediate"),
+      ggplot2::aes(x, y, color = score, shape = point_type)
+    ) +
+    ggplot2::geom_point(
+      data = inst$points |> dplyr::filter(point_type == "terminal"),
+      ggplot2::aes(x, y), color = "red", shape = 17
+    ) +
+    ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
+    ggplot2::theme_bw() +
+    ggplot2::guides(shape = "none")
+
+  return(p)
 }

@@ -4,7 +4,7 @@
 \alias{plot.instance}
 \title{Plot method for instance object}
 \usage{
-\method{plot}{instance}(inst)
+\method{plot}{instance}(inst, delaunay = FALSE, voronoi = FALSE)
 }
 \arguments{
 \item{inst}{Object of class `instance`}

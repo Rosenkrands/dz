@@ -31,15 +31,21 @@ You can install the development version of dz from [GitHub](https://github.com/)
 devtools::install_github("Rosenkrands/dz")
 ```
 
+We can then load the library with the following command:
+
+```{r}
+library(dz)
+```
+
+
 ## Test instances
 
 There are 7 seven test instances included in the package.
 They can be accessed with `dz::test_instances`.
 ```{r}
-length(dz::test_instances)
+length(test_instances)
 ```
 
 ```{r}
-plot(dz::test_instances$p1_tsiligirides)
+plot(test_instances$p1_tsiligirides, delaunay = T, voronoi = T)
 ```
-

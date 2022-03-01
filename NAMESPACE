@@ -2,3 +2,4 @@
 
 S3method(plot,instance)
 export(instance)
+importFrom(Rcpp,sourceCpp)
