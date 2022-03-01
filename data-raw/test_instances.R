@@ -3,6 +3,7 @@ file_paths <- list.files("inst/extdata/test_instances", recursive = T, full.name
 
 # use `instance` function to instantiate as instance objects
 test_instances <- lapply(file_paths, instance)
+
 # extract names from files paths
 names(test_instances) <- do.call(
   c,
@@ -15,5 +16,8 @@ names(test_instances) <- do.call(
         paste(collapse = "_")
     )
 )
+
+# order test_instances by names
+test_instances <- test_instances[order(names(test_instances))]
 
 usethis::use_data(test_instances, overwrite = TRUE)
