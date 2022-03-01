@@ -8,6 +8,10 @@
 }
 \arguments{
 \item{inst}{Object of class `instance`}
+
+\item{delaunay}{Show edges from a Delaunay triangulation}
+
+\item{voronoi}{Show tiles from a Voronoi tesselation}
 }
 \value{
 A ggplot object

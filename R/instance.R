@@ -34,6 +34,8 @@ instance <- function(path_to_file) {
 #' Plot method for instance object
 #'
 #' @param inst Object of class `instance`
+#' @param delaunay Show edges from a Delaunay triangulation
+#' @param voronoi Show tiles from a Voronoi tesselation
 #'
 #' @return A ggplot object
 #' @export
