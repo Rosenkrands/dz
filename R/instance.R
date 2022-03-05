@@ -12,8 +12,6 @@
 #'   `n` an integer equal to the number of points in the instance.
 #' @export
 #'
-#' @examples
-#' # WIP
 instance <- function(path_to_file) {
   points <- utils::read.table(path_to_file) |>
     tibble::tibble() |>

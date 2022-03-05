@@ -20,6 +20,3 @@ instance(path_to_file)
 There are some test instances included in the package, both as raw data and as instance objects.
 This function is used to convert the raw data to instance objects.
 }
-\examples{
-# WIP
-}

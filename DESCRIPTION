@@ -23,7 +23,9 @@ Imports:
     BH,
     deldir,
     ggvoronoi,
-    igraph
+    igraph,
+    ggalt,
+    cluster
 Depends: 
     R (>= 2.10)
 LazyData: true
