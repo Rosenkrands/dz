@@ -37,6 +37,8 @@ clustering <- function(inst, k, cluster_method = "pam") {
   structure(
     list(
       "instance" = inst,
+      "k" = k,
+      "cluster_method" = cluster_method,
       "in_points" = in_points
     ),
     class = "clustering"
