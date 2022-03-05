@@ -25,7 +25,8 @@ Imports:
     ggvoronoi,
     igraph,
     ggalt,
-    cluster
+    cluster,
+    tidyr
 Depends: 
     R (>= 2.10)
 LazyData: true

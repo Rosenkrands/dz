@@ -2,6 +2,8 @@
 
 S3method(plot,clustering)
 S3method(plot,instance)
+S3method(plot,routing)
 export(clustering)
 export(instance)
+export(routing)
 importFrom(Rcpp,sourceCpp)
