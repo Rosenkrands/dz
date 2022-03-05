@@ -41,7 +41,8 @@ length(test_instances)
 ```
 
 ``` r
-plot(test_instances$p7_chao, delaunay = F, voronoi = F)
+inst <- test_instances$p7_chao 
+plot(inst, delaunay = F, voronoi = F)
 ```
 
 <img src="man/figures/README-plot_test_instance-1.png" width="100%" />
@@ -53,7 +54,7 @@ a number of disjoint sets (disregarding the source node).
 
 ``` r
 clust <- clustering(
-  inst = test_instances$p7_chao,
+  inst = inst,
   k = 4,
   cluster_method = "pam"
 )
@@ -75,6 +76,8 @@ Given the an instance with clusters we are able to find a set of routes
 using the `routing` function.
 
 ``` r
+set.seed(6)
+
 rout <- routing(
   clust = clust,
   routing_method = "random"

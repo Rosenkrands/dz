@@ -47,7 +47,8 @@ length(test_instances)
 ```
 
 ```{r plot_test_instance}
-plot(test_instances$p7_chao, delaunay = F, voronoi = F)
+inst <- test_instances$p7_chao 
+plot(inst, delaunay = F, voronoi = F)
 ```
 
 ## Clustering
@@ -56,7 +57,7 @@ With the `clustering` function we are able to decompose an instance into a numbe
 
 ```{r perform_clustering}
 clust <- clustering(
-  inst = test_instances$p7_chao,
+  inst = inst,
   k = 4,
   cluster_method = "pam"
 )
@@ -68,6 +69,8 @@ plot(clust)
 Given the an instance with clusters we are able to find a set of routes using the `routing` function.
 
 ```{r perform_routing}
+set.seed(6)
+
 rout <- routing(
   clust = clust,
   routing_method = "random"
