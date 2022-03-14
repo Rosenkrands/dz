@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 # Dynamic Zoning
 
 <!-- badges: start -->
-`r badger::badge_lifecycle("experimental")` `r badger::badge_repostatus("Active")`
+`r badger::badge_repostatus("Active")`
 <!-- badges: end -->
 
 The goal of dz is to showcase algorithms developed to handle dynamic zoning applications for the team-orienteering problem.
@@ -48,33 +48,50 @@ length(test_instances)
 
 ```{r plot_test_instance}
 inst <- test_instances$p7_chao 
-plot(inst, delaunay = F, voronoi = F)
+plot(inst, delaunay = T, voronoi = F)
 ```
 
 ## Clustering
 
 With the `clustering` function we are able to decompose an instance into a number of disjoint sets (disregarding the source node).
 
-```{r perform_clustering}
-clust <- clustering(
+As of now there are two methods to perform the clustering; the greedy approach and a local search approach.
+Below we can see the resulting clusters from the greedy approach.
+
+```{r perform_clustering_greedy, cache = T}
+clust_gr <- clustering(
   inst = inst,
   k = 4,
-  cluster_method = "pam"
+  cluster_method = "greedy"
 )
 
-plot(clust)
+plot(clust_gr)
 ```
+
+The local search approach tries to improve on the greedy approach using an insertion operator.
+Resulting clusters from the local search approach are shown below.
+
+```{r perform_clustering_local_search, cache = T}
+clust_ls <- clustering(
+  inst = inst,
+  k = 4,
+  cluster_method = "local_search"
+)
+
+plot(clust_ls)
+```
+
 ## Routing
 
-Given the an instance with clusters we are able to find a set of routes using the `routing` function.
+Given an instance with clusters we are able to find a set of routes using the `routing` function.
 
 ```{r perform_routing}
-set.seed(6)
-
-rout <- routing(
-  clust = clust,
-  routing_method = "random"
-)
-
-plot(rout)
+# set.seed(6)
+# 
+# rout <- routing(
+#   clust = clust_gr,
+#   routing_method = "random"
+# )
+# 
+# plot(rout)
 ```

@@ -4,7 +4,7 @@
 \alias{plot.clustering}
 \title{Plot method for a clustering object}
 \usage{
-\method{plot}{clustering}(clust)
+\method{plot}{clustering}(clust, delaunay = T)
 }
 \arguments{
 \item{clust}{A list returned from the `clustering` function}

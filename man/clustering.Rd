@@ -4,7 +4,7 @@
 \alias{clustering}
 \title{Generate clusters based on an instance}
 \usage{
-clustering(inst, k, cluster_method = "pam")
+clustering(inst, k, cluster_method = c("greedy", "local_search"))
 }
 \arguments{
 \item{inst}{An object returned from the `instance` function}

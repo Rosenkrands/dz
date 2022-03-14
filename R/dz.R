@@ -1,4 +1,3 @@
-## usethis namespace: start
+#' @useDynLib dz
 #' @importFrom Rcpp sourceCpp
-## usethis namespace: end
 NULL

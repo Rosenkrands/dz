@@ -11,7 +11,7 @@
 #'
 clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; k = 4; cluster_method = "greedy"
+  # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"
 
   # Save only the intermediate points for clustering
   in_points <- inst$points |> dplyr::filter(point_type == "intermediate")
@@ -35,18 +35,20 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
     # keep track of unassigned points
     unassigned <- in_points
     while(nrow(unassigned) > 0) {
-      cat("unassigned points: ", nrow(unassigned), "\n")
       for (i in 1:k) {
-        cat("zone: ", i, "\n")
+        cat("unassigned points:", nrow(unassigned), "\r")
+        # cat("zone: ", i, "\n")
         # assign nearest point to each zone
         points_in_zone <- zones[[i]]
+
+        # if (length(zones[[4]]) == 16) stop("we are here!")
 
         # Find the delaunay neighbors
         nghbr <- tri |>
           dplyr::filter((ind1 %in% unassigned$id) | (ind2 %in% unassigned$id)) |>
           dplyr::filter(
             ((ind1 %in% points_in_zone) & !(ind2 %in% points_in_zone)) |
-            ((ind2 %in% points_in_zone) & !(ind1 %in% points_in_zone))
+              ((ind2 %in% points_in_zone) & !(ind1 %in% points_in_zone))
           ) |>
           dplyr::select(ind1, ind2) |>
           tidyr::pivot_longer(cols = c(ind1, ind2), names_to = NULL, values_to = "id") |>
@@ -62,7 +64,7 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
           dplyr::rowwise() |>
           dplyr::mutate(dist = dst[id1, id2]) |>
           dplyr::ungroup() |>
-          dplyr::slice_min(dist, n = 1) |>
+          dplyr::slice_min(dist, n = 1, with_ties = F) |>
           dplyr::pull(id2)
 
         # add to zone
@@ -72,6 +74,7 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
         unassigned <- unassigned |> dplyr::filter(!(id %in% closest_points))
       }
     }
+    cat("unassigned points: 0\nall done!")
 
     # add the sink node to each zone
     for (i in 1:k) {
@@ -83,48 +86,45 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
         "inst_points" = inst$points |>
           dplyr::left_join(
             tibble::tibble(zone = 1:k, id = zones) |>
-              tidyr::unnest(cols = id),
+              tidyr::unnest(cols = id) |>
+              dplyr::filter(id != 1, id != inst$n),
             by = c("id" = "id")
           ),
         "zones" = zones
       )
-
     )
   }
 
-  local_search_clustering <- function() {
-    # Compute the initial clustering
+  local_search_clustering <- function () {
+    message("Performing the initial greedy clustering")
     gclust <- greedy_clustering()
 
     # storing the points and zones
     inst$points <- gclust$inst_points
     zones <- gclust$zones
 
+    # wrapper for the cluster eval function to restrict to a single argument
     cluster_eval <- function(zone) {
-      # For testing purposes:
-      # zone = c(1, 40, 42, 76, 22, 60, 14, 75, 100, 61, 12, 98, 24, 37, 23, 13, 63, 27, 91, 49, 85, 78, 67, 79, 36, 102)
-
-      total_profit <- inst$points |>
-        dplyr::filter(id %in% zone) |>
-        dplyr::summarise(score = sum(score)) |>
-        dplyr::pull(score)
-
-      average_distance <- expand.grid(id1 = zone, id2 = zone) |>
-        dplyr::rowwise() |>
-        dplyr::mutate(dist = dst[id1, id2]) |>
-        dplyr::ungroup() |>
-        dplyr::filter(dist != 0) |>
-        dplyr::summarise(dist = mean(dist)) |>
-        dplyr::pull(dist)
-
-      average_distance/total_profit
+      # cpp version of the calculation
+      cluster_eval_cpp(
+        zone,
+        inst = inst$points |> dplyr::select(id,x,y,score) |> data.matrix()
+      )
     }
 
-    # define the operators for the local search
-
+    # Operators for the local search (for now there is only insertion)
     # take a point from one cluster and add it to another
-    insertion <- function() {
-      #do.call(sum, lapply(zones, cluster_eval))
+    insertion <- function(zones) {
+
+      # Update zones for generating the candidates
+      inst_temp <- inst$points |>
+        dplyr::select(id) |>
+        dplyr::left_join(
+          tibble::tibble(zone = 1:k, id = zones) |>
+            tidyr::unnest(cols = id) |>
+            dplyr::filter(id != 1, id != inst$n),
+          by = c("id" = "id")
+        )
 
       # A candidate should be understood as moving the respective id to the respective zone
       candidates <- tri |>
@@ -132,14 +132,16 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
         dplyr::filter(
           ind1 != 1, ind2 != 1, ind1 != nrow(inst$points), ind2 != nrow(inst$points)
         ) |>
-        dplyr::inner_join(inst$points |> dplyr::select(id, zone), by = c("ind1" = "id")) |>
-        dplyr::inner_join(inst$points |> dplyr::select(id, zone), by = c("ind2" = "id")) |>
+        dplyr::inner_join(inst_temp, by = c("ind1" = "id")) |>
+        dplyr::inner_join(inst_temp, by = c("ind2" = "id")) |>
         dplyr::filter(zone.x != zone.y) |>
         tidyr::pivot_longer(cols = c(zone.x, zone.y), values_to = "zone_id") |>
         dplyr::mutate(id1 = ifelse(name == "zone.y", ind1, ind2),
                       id2 = ifelse(name == "zone.x", ind1, ind2)) |>
-        dplyr::select(id = id1, zone_id)
+        dplyr::select(id = id1, zone_id) |>
+        dplyr::distinct()
 
+      # Calculate the resulting objective of performing the insertion
       insert_eval <- function(id, zone_id) {
         # find where the point is coming from and remove it
         for (i in 1:k) {
@@ -155,13 +157,128 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
           id,
           after = length(zones[[zone_id]]) - 1
         )
+
+        # lastly make the cluster evaluation
+        # obj_r <- do.call(sum, lapply(zones, cluster_eval_r))
+        obj_cpp <- do.call(sum, lapply(zones, cluster_eval))
+        # cat("R objective:", obj_r, "\t Cpp objective:", obj_cpp, "\n")
+        # dput(zones)
+        return(obj_cpp)
+      }
+
+      best_insert <- NA
+      best_insert_obj <- Inf
+      cat("\n")
+      for (i in 1:nrow(candidates)) {
+        cat("candidates left:", nrow(candidates) - i, "\r")
+        id <- candidates[i,] |> dplyr::pull(id)
+        zone_id <- candidates[i,] |> dplyr::pull(zone_id)
+
+        candidate_obj <- insert_eval(id, zone_id)
+        if (candidate_obj < best_insert_obj) {
+          best_insert_obj <- candidate_obj
+          best_insert <- candidates[i,]
+        }
+      }
+
+      # best_insert <- candidates |>
+      #   dplyr::rowwise() |>
+      #   dplyr::mutate(objective = insert_eval(id, zone_id)) |>
+      #   dplyr::ungroup() |>
+      #   dplyr::slice_min(objective, n = 1, with_ties = F)
+
+      # print(best_insert)
+
+      # find where the point is coming from and remove it
+      for (i in 1:k) {
+        # message("looking for best_insert$id")
+        if (i == best_insert$zone_id) next
+        if (best_insert$id %in% zones[[i]]) {
+          # message("found the origin of best_insert$id")
+          zones[[i]] <- zones[[i]][zones[[i]] != best_insert$id]
+          break
+        }
+      }
+
+      # then insert it in the new zone
+      zones[[best_insert$zone_id]] <- append(
+        zones[[best_insert$zone_id]],
+        best_insert$id,
+        after = length(zones[[best_insert$zone_id]]) - 1
+      )
+
+      zones
+    }
+
+    # local search part
+    message("Starting the local search")
+    iter_max = 100
+
+    initial_obj <- do.call(sum, lapply(zones, cluster_eval))
+    cat("Inital objective is:", initial_obj, "\n")
+
+    # save convergence data in vector
+    ls_obj <- numeric(length = iter_max + 1)
+    ls_obj[1] <- initial_obj
+
+    # save zones for animation
+    zones_list <- list()
+    zones_list[[1]] <- zones
+
+    bks_obj <- initial_obj
+
+    iter = 0
+    while(T) {
+      iter = iter + 1
+      new_zones <- insertion(zones)
+      new_obj <- do.call(sum, lapply(new_zones, cluster_eval))
+
+      if (new_obj < bks_obj) {
+        zones <- new_zones
+        bks_obj <- new_obj
+
+        # saving data for the convergence plot
+        ls_obj[iter + 1] <- new_obj
+
+        # saving data for the zone animation
+        zones_list[[iter + 1]] <- zones
+
+        cat("objective:", bks_obj, "\titeration:", iter)
+      } else {
+        ls_obj[iter + 1] <- ls_obj[iter]
+        zones_list[[iter + 1]] <- zones_list[[iter]]
+        cat("\nlocal search conclude with bks:", bks_obj)
+        break
+      }
+
+      if (iter == iter_max) {
+        cat("\nreached maximum number of iterations\n")
+        break
       }
     }
+
+    # Adjust iter_max if local search concluded
+    iter_max <- iter
+
+    return(
+      list(
+        "inst_points" = inst$points |>
+          dplyr::select(id, point_type, x, y, score) |>
+          dplyr::left_join(
+            tibble::tibble(zone = 1:k, id = zones) |>
+              tidyr::unnest(cols = id) |>
+              dplyr::filter(id != 1, id != inst$n),
+            by = c("id" = "id")
+          ),
+        "zones" = zones
+      )
+    )
   }
 
   inst$points <- switch(
     cluster_method,
-    "greedy" = (greedy_clustering())$inst_points
+    "greedy" = (greedy_clustering())$inst_points,
+    "local_search" = (local_search_clustering())$inst_points
   )
 
   structure(
@@ -192,25 +309,30 @@ plot.clustering <- function(clust, delaunay = T) {
     # If either delaunay or voronoi is true we compute the triangulation
   if (delaunay) {
     tri <- deldir::deldir(clust$instance$points$x, clust$instance$points$y)
+    delsgs_same_zone <- tri$delsgs |>
+      dplyr::left_join(
+        clust$instance$points |> dplyr::select(id, zone),
+        by = c("ind1" = "id")
+      ) |>
+      dplyr::left_join(
+        clust$instance$points |> dplyr::select(id, zone),
+        by = c("ind2" = "id")
+      ) |>
+      dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
+      dplyr::distinct(x1, y1, x2, y2)
   }
 
   # Add delaunay edges
   if (delaunay) {
     p <- p +
       ggplot2::geom_segment(
-        data = tri$delsgs,
+        data = delsgs_same_zone,
         ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
         color = ggplot2::alpha("black", 0.3), linetype = "dashed"
       )
   }
 
   p +
-    # Find the smallest polygon including all nodes in each zone
-    # ggalt::geom_encircle(
-    #   data = clust$instance$points,
-    #   ggplot2::aes(x = x, y = y, group = zone, fill = as.character(zone)),
-    #   s_shape = 1, expand = 0, alpha = 0.2
-    # ) +
     # Plot the intermediate node with color according to score
     ggplot2::geom_point(
       data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
