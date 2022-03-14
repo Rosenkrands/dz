@@ -32,6 +32,7 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
       zones[[i]] <- c(1)
     }
 
+    # THE FOLLOWING COULD ALSO BE DONE IN CPP IF WORTH THE TIME
     # keep track of unassigned points
     unassigned <- in_points
     while(nrow(unassigned) > 0) {
