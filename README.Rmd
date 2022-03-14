@@ -81,6 +81,12 @@ clust_ls <- clustering(
 plot(clust_ls)
 ```
 
+In the below animation we can see how the initial clustering in iteratively improved using the local search approach.
+
+![](local_search_animation.gif)
+
+The animation is created using `animate_local_search(clust_ls)`.
+
 ## Routing
 
 Given an instance with clusters we are able to find a set of routes using the `routing` function.

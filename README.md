@@ -63,6 +63,13 @@ are shown below.
 
 <img src="man/figures/README-perform_clustering_ls-1.png" width="100%" />
 
+In the below animation we can see how the initial clustering in
+iteratively improved using the local search approach.
+
+![](local_search_animation.gif)
+
+The animation is created using `animate_local_search(clust_ls)`.
+
 ## Routing
 
 Given an instance with clusters we are able to find a set of routes

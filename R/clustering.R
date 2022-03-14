@@ -95,7 +95,7 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
     )
   }
 
-  local_search_clustering <- function () {
+  local_search_clustering <- function() {
     message("Performing the initial greedy clustering")
     gclust <- greedy_clustering()
 
@@ -158,12 +158,7 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
           after = length(zones[[zone_id]]) - 1
         )
 
-        # lastly make the cluster evaluation
-        # obj_r <- do.call(sum, lapply(zones, cluster_eval_r))
-        obj_cpp <- do.call(sum, lapply(zones, cluster_eval))
-        # cat("R objective:", obj_r, "\t Cpp objective:", obj_cpp, "\n")
-        # dput(zones)
-        return(obj_cpp)
+        do.call(sum, lapply(zones, cluster_eval))
       }
 
       best_insert <- NA
@@ -270,22 +265,26 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
               dplyr::filter(id != 1, id != inst$n),
             by = c("id" = "id")
           ),
-        "zones" = zones
+        "zones" = zones,
+        "plot_data" = list("obj" = ls_obj, "zones" = zones_list, "iter_max" = iter_max)
       )
     )
   }
 
-  inst$points <- switch(
+  cl <- switch(
     cluster_method,
-    "greedy" = (greedy_clustering())$inst_points,
-    "local_search" = (local_search_clustering())$inst_points
+    "greedy" = greedy_clustering(),
+    "local_search" = local_search_clustering()
   )
+
+  inst$points <- cl$inst_points
 
   structure(
     list(
       "instance" = inst,
       "k" = k,
-      "cluster_method" = cluster_method
+      "cluster_method" = cluster_method,
+      "plot_data" = cl$plot_data
     ),
     class = "clustering"
   )
@@ -351,4 +350,123 @@ plot.clustering <- function(clust, delaunay = T) {
       fill = "none",
       color = "none"
     )
+}
+
+#' Generate animation of the local search clustering approach
+#'
+#' @param clust A list returned by clustering function with cluster_method = "local_search"
+#' @param filename The filename of the gif to be saved
+#'
+#' @return Nothing, saves a .gif file in the current workdir
+#' @export
+#'
+animate_local_search <- function(clust, filename = "animation.gif") {
+  # For testing purposes:
+  # clust <- clust_ls
+
+  # function to plot objective from specific iteration
+  plot_iter_convergence <- function(iter) {
+    y_min <- min(clust$plot_data$obj[1:clust$plot_data$iter_max + 1])
+    y_max <- max(clust$plot_data$obj[1:clust$plot_data$iter_max + 1])
+
+    tibble::tibble(x = 0:(clust$plot_data$iter_max), y = clust$plot_data$obj[1:(clust$plot_data$iter_max+1)]) |>
+      # dplyr::mutate(y = y/y[1]*100) |>
+      dplyr::filter(x < iter + 1) |>
+      ggplot2::ggplot(ggplot2::aes(x, y, group = 1)) +
+      ggplot2::geom_line(color = "black") +
+      # ggplot2::geom_point() +
+      ggplot2::theme_bw() +
+      ggplot2::scale_x_continuous(limits = c(0,clust$plot_data$iter_max)) +
+      ggplot2::scale_y_continuous(limits = c(y_min, y_max)) +
+      ggplot2::labs(
+        x = "Iteration",
+        y = "Objective",
+        title = "Convergence of local search"
+      )
+  }
+
+  # function to plot zone from specific iteration
+  plot_iter_zones <- function(iter, delaunay = T) {
+    zones_list <- clust$plot_data$zones
+
+    plot_points <- clust$instance$points |>
+      dplyr::select(-zone) |>
+      dplyr::left_join(
+        tibble::tibble(zone = 1:clust$k, id = zones_list[[iter]]) |>
+          tidyr::unnest(cols = id),
+        by = c("id" = "id")
+      )
+
+    p <- ggplot2::ggplot()
+
+    # If either delaunay or voronoi is true we compute the triangulation
+    if (delaunay) {
+      tri <- deldir::deldir(plot_points$x, plot_points$y)
+      delsgs_same_zone <- tri$delsgs |>
+        dplyr::left_join(
+          plot_points |> dplyr::select(id, zone),
+          by = c("ind1" = "id")
+        ) |>
+        dplyr::left_join(
+          plot_points |> dplyr::select(id, zone),
+          by = c("ind2" = "id")
+        ) |>
+        dplyr::filter(zone.x == zone.y) |>
+        dplyr::distinct(x1, y1, x2, y2)
+    }
+
+    # Add delaunay edges
+    if (delaunay) {
+      p <- p +
+        ggplot2::geom_segment(
+          data = delsgs_same_zone,
+          ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+          color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+        )
+    }
+
+    p +
+      # Plot the intermediate node with color according to score
+      ggplot2::geom_point(
+        data = plot_points |> dplyr::filter(point_type == "intermediate"),
+        ggplot2::aes(x, y, color = as.character(zone), shape = point_type)
+      ) +
+      # Plot the terminal nodes
+      ggplot2::geom_point(
+        data = plot_points |> dplyr::filter(point_type == "terminal"),
+        ggplot2::aes(x, y), color = "red", shape = 17
+      ) +
+      # Add title, theme and adjustment of guides
+      ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
+      ggplot2::theme_bw() +
+      ggplot2::guides(
+        shape = "none",
+        fill = "none",
+        color = "none"
+      )
+  }
+
+  # animation function that prints individual frames
+  local_search_animation <- function() {
+    for (i in 1:clust$plot_data$iter_max + 1) {
+      cat("iteration", i - 1, "of", clust$plot_data$iter_max, "\r")
+      print(
+        cowplot::plot_grid(
+          plot_iter_convergence(iter = i - 1),
+          plot_iter_zones(iter = i, delaunay = T)
+        )
+      )
+    }
+    cat("\n")
+  }
+
+  # generate the gif
+  animation::saveGIF(
+    local_search_animation(),
+    movie.name = filename,
+    interval = .1,
+    ani.width = 1920,
+    ani.height = 1080,
+    ani.res = 250
+  )
 }
