@@ -55,13 +55,13 @@ As of now there are two methods to perform the clustering; the greedy
 approach and a local search approach. Below we can see the resulting
 clusters from the greedy approach.
 
-<img src="man/figures/README-perform_clustering_greedy-1.png" width="100%" />
+<img src="man/figures/README-perform_clustering_gr-1.png" width="100%" />
 
 The local search approach tries to improve on the greedy approach using
 an insertion operator. Resulting clusters from the local search approach
 are shown below.
 
-<img src="man/figures/README-perform_clustering_local_search-1.png" width="100%" />
+<img src="man/figures/README-perform_clustering_ls-1.png" width="100%" />
 
 ## Routing
 

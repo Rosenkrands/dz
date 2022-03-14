@@ -58,7 +58,7 @@ With the `clustering` function we are able to decompose an instance into a numbe
 As of now there are two methods to perform the clustering; the greedy approach and a local search approach.
 Below we can see the resulting clusters from the greedy approach.
 
-```{r perform_clustering_greedy, cache = T, echo = F, results = F}
+```{r perform_clustering_gr, cache = T, echo = F, results = F}
 clust_gr <- clustering(
   inst = inst,
   k = 4,
@@ -71,7 +71,7 @@ plot(clust_gr)
 The local search approach tries to improve on the greedy approach using an insertion operator.
 Resulting clusters from the local search approach are shown below.
 
-```{r perform_clustering_local_search, cache = T, echo = F, message = F, results = F}
+```{r perform_clustering_ls, cache = T, echo = F, message = F, results = F}
 clust_ls <- clustering(
   inst = inst,
   k = 4,

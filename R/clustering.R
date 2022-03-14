@@ -348,6 +348,7 @@ plot.clustering <- function(clust, delaunay = T) {
     ggplot2::theme_bw() +
     ggplot2::guides(
       shape = "none",
-      fill = "none"
+      fill = "none",
+      color = "none"
     )
 }
