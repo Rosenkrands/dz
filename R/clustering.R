@@ -282,11 +282,11 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
 
   same_zone_edges <- tri |>
     dplyr::left_join(
-      clust$instance$points |> dplyr::select(id, zone),
+      inst$points |> dplyr::select(id, zone),
       by = c("ind1" = "id")
     ) |>
     dplyr::left_join(
-      clust$instance$points |> dplyr::select(id, zone),
+      inst$points |> dplyr::select(id, zone),
       by = c("ind2" = "id")
     ) |>
     dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
