@@ -2,11 +2,30 @@ library(deldir)
 library(tidyverse)
 library(dz)
 library(igraph)
+library(dplyr)
+
+# For testing purposes:
+# clust <- readRDS("clust_ls.rds")
 
 # Our data
-terminal <- as.data.frame(test_instances$p7_chao$points %>% filter(point_type == "terminal") %>% select(-'point_type'))[1,]
-points <- as.data.frame(test_instances$p7_chao$points %>% filter(point_type == "intermediate") %>% select(-'point_type'))
-all_points <- rbind(terminal, points)
+# terminal <- as.data.frame(test_instances$p7_chao$points %>% filter(point_type == "terminal") %>% select(-'point_type'))[1,]
+clust$instance$points |> dplyr::filter(id == 1) |> dplyr::select(id, x, y, score)
+
+all_points <- clust$instance$points |>
+  dplyr::filter(id != nrow(clust$instance$points)) |>
+  dplyr::select(id, x, y, score, zone)
+
+select_zone <- function(zone_id) {
+  # zone_id = 1
+  clust$instance$points |>
+    dplyr::filter((id == 1) | (zone == zone_id))
+}
+
+points <- 1:clust$k |> as.list() |> lapply(select_zone)
+
+# points <- as.data.frame(test_instances$p7_chao$points %>% filter(point_type == "intermediate") %>% select(-'point_type'))
+
+# all_points <- rbind(terminal, points)
 
 # Triangulation
 tp <- deldir(x = all_points$x, y = all_points$y)
