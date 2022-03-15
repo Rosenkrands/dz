@@ -43,8 +43,8 @@ dist2 <- function(id1, id2, g){
 }
 
 # Create route given points
-solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1, plot = T){
-  # obj = 'SDR'; L = 100; zone_id = 1; plot = T
+solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
+  # obj = 'SDR'; L = 500; zone_id = 2
   map = points[[zone_id]]
   delsgs <- clust$same_zone_edges |>
     dplyr::filter(zone == zone_id) |>
@@ -61,7 +61,6 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1, plot = T){
     dplyr::inner_join(lookup, by = c("ind2" = "id")) |>
     dplyr::select(-ind2, ind2 = local_id)
 
-
   g <- graph.data.frame(delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = map %>% select(local_id, score))
   candidates <- map$local_id
   route = integer()
@@ -74,10 +73,7 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1, plot = T){
       d <- vector(length = length(map$id))
       s <- vector(length = length(map$id))
       SDR <- vector(length = length(map$id))
-      # for (candidate in candidates) {
       for (i in 1:length(candidates)) {
-        print(i)
-        # candidate = candidates[3]
         route_temp <- route
         route_temp <- append(route_temp, candidates[i], after = length(route_temp)-1)
         d[i] <- dist(route[length(route)], candidates[i], g = g) +
@@ -118,60 +114,60 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1, plot = T){
       # Switch last two before terminal
       # route <- replace(route, c(length(route)-1, length(route)-2), route[c(length(route)-2, length(route)-1)])
       # Function to plot path using information in route object
-      if (plot == TRUE){
-        plot_obj <- list()
-        rout <- list()
-        plot_obj[[1]] <- lookup$id[route]
-        rout$routes <- tibble(agent_id = 1:1, routes = plot_obj)
-        rout$instance$points <- test_instances$p7_chao$points
-        route_segments <- rout$routes |>
-          tidyr::unnest(routes) |>
-          dplyr::group_by(agent_id) |>
-          dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
-          dplyr::filter(!is.na(id_start)) |>
-          dplyr::select(-routes) |>
-          dplyr::inner_join(rout$instance$points |> dplyr::select(id, x, y),
-                            by = c("id_start" = "id")) |>
-          dplyr::inner_join(rout$instance$points |> dplyr::select(id, x, y),
-                            by = c("id_end" = "id"), suffix = c("","end"))
-
-        # Plot the segment on the existing plot
-        plot <- ggplot2::ggplot() +
-          # ggalt::geom_encircle(
-          #   data = rout$in_points,
-          #   ggplot2::aes(x = x, y = y, group = zone, fill = as.character(zone)),
-          #   s_shape = 1, expand = 0, alpha = 0.2
-          # ) +
-          ggplot2::geom_text(
-            data = rout$instance$points |> dplyr::filter(point_type == "intermediate"),
-            ggplot2::aes(x, y, label = id)
-          ) +
-          ggplot2::geom_segment(
-            data = route_segments,
-            ggplot2::aes(x=x, y=y, xend=xend, yend=yend)
-          ) +
-          ggplot2::geom_point(
-            data = rout$instance$points |> dplyr::filter(point_type == "terminal"),
-            ggplot2::aes(x, y), color = "red", shape = 17
-          ) +
-          ggplot2::ggtitle(paste0("Instance: ", rout$instance$name)) +
-          ggplot2::theme_bw() +
-          ggplot2::guides(
-            shape = "none",
-            fill = "none"
-          ) +
-        ggplot2::geom_segment(
-          data = delsgs,
-          ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
-          color = ggplot2::alpha("black", 0.3), linetype = "dashed"
-        )
-      }
-      output <- list(route, L, s_total, plot)
+      output <- list("route" = route, "L" = L, "s_total" = s_total, "delsgs" = delsgs)
       return(output)
     }
   }
 }
 
+rout <- solve_routing(zone_id = 3)
+
+plot_obj <- list()
+# rout <- list()
+plot_obj[[1]] <- lookup$id[rout[[1]]]
+rout$routes <- tibble(agent_id = 1:1, routes = plot_obj)
+rout$instance$points <- test_instances$p7_chao$points
+route_segments <- rout$routes |>
+  tidyr::unnest(routes) |>
+  dplyr::group_by(agent_id) |>
+  dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
+  dplyr::filter(!is.na(id_start)) |>
+  dplyr::select(-routes) |>
+  dplyr::inner_join(rout$instance$points |> dplyr::select(id, x, y),
+                    by = c("id_start" = "id")) |>
+  dplyr::inner_join(rout$instance$points |> dplyr::select(id, x, y),
+                    by = c("id_end" = "id"), suffix = c("","end"))
+
+# Plot the segment on the existing plot
+ggplot2::ggplot() +
+  # ggalt::geom_encircle(
+  #   data = rout$in_points,
+  #   ggplot2::aes(x = x, y = y, group = zone, fill = as.character(zone)),
+  #   s_shape = 1, expand = 0, alpha = 0.2
+  # ) +
+  ggplot2::geom_text(
+    data = rout$instance$points |> dplyr::filter(point_type == "intermediate"),
+    ggplot2::aes(x, y, label = id)
+  ) +
+  ggplot2::geom_segment(
+    data = route_segments,
+    ggplot2::aes(x=x, y=y, xend=xend, yend=yend)
+  ) +
+  ggplot2::geom_point(
+    data = rout$instance$points |> dplyr::filter(point_type == "terminal"),
+    ggplot2::aes(x, y), color = "red", shape = 17
+  ) +
+  ggplot2::ggtitle(paste0("Instance: ", rout$instance$name)) +
+  ggplot2::theme_bw() +
+  ggplot2::guides(
+    shape = "none",
+    fill = "none"
+  ) +
+  ggplot2::geom_segment(
+    data = delsgs,
+    ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+    color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+  )
 
 
 
