@@ -7,8 +7,6 @@ library(dplyr)
 # For testing purposes:
 # clust <- readRDS("clust_ls.rds")
 
-clust$instance$points |> dplyr::filter(id == 1) |> dplyr::select(id, x, y, score)
-
 all_points <- clust$instance$points |>
   dplyr::filter(id != nrow(clust$instance$points)) |>
   dplyr::select(id, x, y, score, zone)
@@ -45,23 +43,27 @@ dist2 <- function(id1, id2, g){
 }
 
 # Create route given points
-solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
-  # obj = 'SDR'; L = 100; map = points[[1]]; plot = T
-  tp <- deldir(x = map$x, y = map$y)
-  tp$delsgs$dist <- sqrt((tp$delsgs$x1 - tp$delsgs$x2)^2 + (tp$delsgs$y1 - tp$delsgs$y2)^2)
+solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1, plot = T){
+  # obj = 'SDR'; L = 100; zone_id = 1; plot = T
+  map = points[[zone_id]]
+  delsgs <- clust$same_zone_edges |>
+    dplyr::filter(zone == zone_id) |>
+    as_tibble()
+
+  delsgs$dist <- sqrt((delsgs$x1 - delsgs$x2)^2 + (delsgs$y1 - delsgs$y2)^2)
 
   # adapt to correct ids
-  lookup <- map |> dplyr::mutate(ind = row_number()) |> select(ind, id)
-  map <- map |> mutate(ind = row_number(), .before = everything())
-  # tp$delsgs <- tp$delsgs |>
-  #   dplyr::inner_join(lookup, by = c("ind1" = "ind")) |>
-  #   dplyr::select(-ind1, ind1 = id) |>
-  #   dplyr::inner_join(lookup, by = c("ind2" = "ind")) |>
-  #   dplyr::select(-ind2, ind2 = id)
+  lookup <- map |> dplyr::mutate(local_id = row_number()) |> select(local_id, id)
+  map <- map |> mutate(local_id = row_number(), .before = everything())
+  delsgs <- delsgs |>
+    dplyr::inner_join(lookup, by = c("ind1" = "id")) |>
+    dplyr::select(-ind1, ind1 = local_id) |>
+    dplyr::inner_join(lookup, by = c("ind2" = "id")) |>
+    dplyr::select(-ind2, ind2 = local_id)
 
 
-  g <- graph.data.frame(tp$delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = map %>% select(ind, score))
-  candidates <- map$ind
+  g <- graph.data.frame(delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = map %>% select(local_id, score))
+  candidates <- map$local_id
   route = integer()
   route <- append(route, 1)
   last_in_current <- route[length(route)]
@@ -159,7 +161,7 @@ solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
             fill = "none"
           ) +
         ggplot2::geom_segment(
-          data = tp$delsgs,
+          data = delsgs,
           ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
           color = ggplot2::alpha("black", 0.3), linetype = "dashed"
         )
