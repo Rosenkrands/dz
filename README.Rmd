@@ -68,6 +68,7 @@ clust_gr <- clustering(
 plot(clust_gr)
 ```
 
+
 The local search approach tries to improve on the greedy approach using an insertion operator.
 Resulting clusters from the local search approach are shown below.
 
@@ -77,6 +78,8 @@ clust_ls <- clustering(
   k = 4,
   cluster_method = "local_search"
 )
+
+# saveRDS(clust_ls, file = "clust_ls.rds")
 
 plot(clust_ls)
 ```
@@ -91,13 +94,12 @@ The animation is created using `animate_local_search(clust_ls)`.
 
 Given an instance with clusters we are able to find a set of routes using the `routing` function.
 
-```{r perform_routing}
-# set.seed(6)
-# 
-# rout <- routing(
-#   clust = clust_gr,
-#   routing_method = "random"
-# )
-# 
-# plot(rout)
+```{r perform_routing, cache = T}
+rout <- routing(
+  clust = clust_ls,
+  obj = "SDR",
+  L = 500
+)
+
+plot(rout)
 ```

@@ -3,100 +3,155 @@
 #' Given a clustered instance and a routing method the function will provide routes for the given instance.
 #'
 #' @param clust A list returned from the `clustering` function
-#' @param routing_method A method from which to perform the routing
+#' @param obj The objective to use for the routing
+#' @param L The range constraint induced on the agents
 #'
 #' @return A list
 #' @export
 #'
-routing <- function(clust, routing_method = "random") {
+routing <- function(clust, obj = "SDR", L = 500) {
   # For testing purposes:
-  # clust = clustering(test_instances$p7_chao, k = 4, cluster_method = "pam"); routing_method = "random"
+  # clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
 
-  # First we should find the closest point in each cluster to the source node
-  first_point <- clust$instance$points |>
-    dplyr::mutate(dist_to_source = sqrt((x - x[1])^2 + (y - y[1])^2)) |> # Calculate the distance to the source node
-    dplyr::group_by(zone) |>
-    dplyr::filter(dist_to_source == min(dist_to_source), # Get smallest distance by zone,
-                  !is.na(zone)) # Remove the source node
-
-  if ((nrow(first_point) != clust$k)) {stop("number of rows in first node to visit is not equal to number of zones")}
-
-  # Then we should find the closest point in each cluster to the sink node
-  last_point <- clust$instance$points |>
-    dplyr::mutate(dist_to_source = sqrt((x - x[nrow(clust$instance$points)])^2 + (y - y[nrow(clust$instance$points)])^2)) |> # Calculate the distance to the sink node
-    dplyr::group_by(zone) |>
-    dplyr::filter(dist_to_source == min(dist_to_source), # Get smallest distance by zone,
-                  !is.na(zone))
-
-  if ((nrow(last_point) != clust$k)) {stop("number of rows in last node to visit is not equal to number of zones")}
-
-  # Create a tibble to hold the routes
-  routes <- tibble::tibble(agent_id = 1:clust$k)
-
-  generate_routes <- function(agent_id) {
-    # For testing purposes:
-    # agent_id = 4
-
-    route = integer()
-
-    # First point is the source node
-    route <- append(route, 1)
-
-    # Determine first and last zone point for the agent
-    first_point_in_zone <- first_point |>
-      dplyr::filter(zone == agent_id) |>
-      dplyr::pull(id)
-
-    last_point_in_zone <- last_point |>
-      dplyr::filter(zone == agent_id) |>
-      dplyr::pull(id)
-
-    # Add first zone point for the agent
-    route <- append(
-      route,
-      first_point_in_zone
-    )
-
-    # Add random points to the route
-    route <- append(
-      route,
-      # Find some random point in the zone for illustrative purposes
-      clust$instance$points |>
-        dplyr::filter(
-          zone == agent_id,
-          !id %in% c(first_point_in_zone, last_point_in_zone)
-        ) |>
-        dplyr::pull(id) |>
-        sample(size = 4)
-    )
-
-    # Determine last zone point for the agent
-    route <- append(
-      route,
-      last_point_in_zone
-    )
-
-    # Last point is the terminal node
-    route <- append(route, nrow(clust$instance$points))
-
-    return(route)
+  # Function for calculating the distance of the shortest (DL) path between 2 points.
+  dist <- function(id1, id2, g){
+    # Find vertices that make up the path
+    if (id1 == id2) return(0)
+    short_vert <- as.vector(igraph::shortest_paths(graph = g, from = id1, to = id2, output = "vpath")$vpath[[1]])
+    # Calculate total distance between them
+    route_length <- 0
+    dist_matrix <- igraph::distances(g)
+    for (node in 1:(length(short_vert)-1)){
+      temp <- dist_matrix[short_vert[node], short_vert[node+1]]
+      route_length <- route_length + temp
+    }
+    return(route_length)
   }
 
-  routes <- routes |>
-    dplyr::mutate(routes = lapply(as.list(routes$agent_id), generate_routes))
+  # Dist function that returns only the points in the path
+  dist2 <- function(id1, id2, g){
+    # Find vertices that make up the path
+    if (id1 == id2) return(0)
+    short_vert <- as.vector(igraph::shortest_paths(graph = g, from = id1, to = id2, output = "vpath")$vpath[[1]])
+    return(short_vert)
+  }
+
+  # Create route given points
+  solve_routing <- function(obj = obj, L = 100, zone_id = 1){
+    # obj = obj; L = 100; zone_id = 1
+    map = clust$instance$points |>
+      dplyr::filter((id == 1) | (zone == zone_id))
+
+    delsgs <- clust$same_zone_edges |>
+      dplyr::filter(zone == zone_id) |>
+      tibble::as_tibble()
+
+    delsgs$dist <- sqrt((delsgs$x1 - delsgs$x2)^2 + (delsgs$y1 - delsgs$y2)^2)
+
+    # adapt to correct ids
+    lookup <- map |> dplyr::mutate(local_id = dplyr::row_number()) |> dplyr::select(local_id, id)
+    map <- map |> dplyr::mutate(local_id = dplyr::row_number(), .before = dplyr::everything())
+    delsgs <- delsgs |>
+      dplyr::inner_join(lookup, by = c("ind1" = "id")) |>
+      dplyr::select(-ind1, ind1 = local_id) |>
+      dplyr::inner_join(lookup, by = c("ind2" = "id")) |>
+      dplyr::select(-ind2, ind2 = local_id)
+
+    g <- igraph::graph.data.frame(
+      delsgs |> dplyr::select(ind1, ind2, weight = dist),
+      directed = FALSE,
+      vertices = map |> dplyr::select(local_id, score)
+    )
+
+    candidates <- map$local_id
+    route = integer()
+    route <- append(route, 1)
+    last_in_current <- route[length(route)]
+    route <- append(route, 1)
+    s_total <- 0
+    while (L > 0) {
+      if (obj == 'SDR'){
+        d <- vector(length = length(map$id))
+        s <- vector(length = length(map$id))
+        SDR <- vector(length = length(map$id))
+        for (i in 1:length(candidates)) {
+          route_temp <- route
+          route_temp <- append(route_temp, candidates[i], after = length(route_temp)-1)
+          d[i] <- dist(route[length(route)], candidates[i], g = g) +
+            dist(candidates[i], route[length(route)-1], g = g) -
+            as.vector(dist(route[length(route_temp)-2], route_temp[1], g = g))
+          s[i] <- map[candidates[i],]$score
+          SDR[i] <- s[candidates[i]]/d[candidates[i]]
+        }
+        New_last <- which.max(SDR)
+        all_short_path <- dist2(route[length(route)-1], New_last, g = g)
+        # print(all_short_path[2:length(all_short_path)])
+        #print(route)
+        # candidates <- candidates[!candidates %in% all_short_path]
+        for (node in (all_short_path[2:length(all_short_path)])) {
+          s_total <- s_total + map[node,]$score
+          map[node,]$score <- 0
+        }
+      }
+      if (obj == 'random'){
+        New_last <- sample(2:101, size = 1)
+        all_short_path <- dist2(route[length(route)-1], New_last, g = g)
+        s_total <- s_total + map[New_last,]$score
+        map[New_last,]$score <- 0
+        print(New_last)
+      }
+      if (dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g) < L){
+        route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
+        all_short_path_return <- dist2(New_last, 1, g = g)
+        # For-loop to remove all new distances, not just the last in new shortest path
+        L <- L + dist(last_in_current, 1, g = g)
+        L <- L - dist(route[length(route)], route[length(route)-1], g = g)
+        if (length(all_short_path > 2)){
+          for (i in 1:(length(all_short_path)-1)){
+            L <- L - dist(all_short_path[length(all_short_path)-i+1], all_short_path[length(all_short_path)-i], g = g)
+          }
+        }
+        # print(route)
+      } else {
+        route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
+        # Switch last two before terminal
+        # route <- replace(route, c(length(route)-1, length(route)-2), route[c(length(route)-2, length(route)-1)])
+        # Function to plot path using information in route object
+        output <- list("route" = route, "L" = L, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+        return(output)
+      }
+    }
+  }
+
+  # we want to create a route for each zone
+  routing_results <- tibble::tibble(agent_id = 1:clust$k)
+
+  # calculate the routes
+  rslt <- lapply(
+    routing_results$agent_id,
+    function(zone_id) {solve_routing(obj = "SDR", L = 300, zone_id = zone_id)}
+  )
+
+  # then we gather results from the k routes into one data structure
+  route_list <- lapply(
+    rslt,
+    function(arg) {arg$lookup$id[arg$route]} # convert from local_id to id
+  )
+
+  routing_results$routes <- route_list
+  routing_results$L <- do.call(c, lapply(rslt, function(arg) {arg$L}))
+  routing_results$s_total <- do.call(c, lapply(rslt, function(arg) {arg$s_total}))
 
   structure(
     list(
-      "instance" = clust$instance,
-      "routes" = routes,
-      "k" = clust$k,
-      "cluster_method" = clust$cluster_method,
-      "in_points" = clust$in_points
+      "routing_results" = routing_results,
+      "obj" = obj,
+      "L" = L,
+      "clustering" = clust
     ),
     class = "routing"
   )
 }
-
 
 #' Plot method for a routing object
 #'
@@ -108,41 +163,42 @@ routing <- function(clust, routing_method = "random") {
 #' @export
 #'
 plot.routing <- function(rout) {
-  # Determine segments from routes to plot
-  route_segments <- rout$routes |>
+  # Find the segments induced by the routes
+  route_segments <- rout$routing_results |>
     tidyr::unnest(routes) |>
     dplyr::group_by(agent_id) |>
     dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
     dplyr::filter(!is.na(id_start)) |>
     dplyr::select(-routes) |>
-    dplyr::inner_join(rout$instance$points |> dplyr::select(id, x, y),
+    dplyr::inner_join(rout$clustering$instance$points |> dplyr::select(id, x, y),
                       by = c("id_start" = "id")) |>
-    dplyr::inner_join(rout$instance$points |> dplyr::select(id, x, y),
+    dplyr::inner_join(rout$clustering$instance$points |> dplyr::select(id, x, y),
                       by = c("id_end" = "id"), suffix = c("","end"))
 
   # Plot the segment on the existing plot
   ggplot2::ggplot() +
-    ggalt::geom_encircle(
-      data = rout$in_points,
-      ggplot2::aes(x = x, y = y, group = zone, fill = as.character(zone)),
-      s_shape = 1, expand = 0, alpha = 0.2
+    ggplot2::geom_segment(
+      data = rout$clustering$same_zone_edges,
+      ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+      color = ggplot2::alpha("black", 0.3), linetype = "dashed"
     ) +
     ggplot2::geom_point(
-      data = rout$instance$points |> dplyr::filter(point_type == "intermediate"),
-      ggplot2::aes(x, y, color = score, shape = point_type)
+      data = rout$clustering$instance$points |> dplyr::filter(point_type == "terminal"),
+      ggplot2::aes(x, y), color = "red", shape = 17
+    ) +
+    ggplot2::geom_point(
+      data = rout$clustering$instance$points |> dplyr::filter(point_type == "intermediate"),
+      ggplot2::aes(x, y, color= as.character(zone))
     ) +
     ggplot2::geom_segment(
       data = route_segments,
       ggplot2::aes(x=x, y=y, xend=xend, yend=yend)
     ) +
-    ggplot2::geom_point(
-      data = rout$instance$points |> dplyr::filter(point_type == "terminal"),
-      ggplot2::aes(x, y), color = "red", shape = 17
-    ) +
-    ggplot2::ggtitle(paste0("Instance: ", rout$instance$name)) +
+    ggplot2::ggtitle(paste0("Instance: ", rout$clustering$instance$name)) +
     ggplot2::theme_bw() +
     ggplot2::guides(
       shape = "none",
-      fill = "none"
+      fill = "none",
+      color = "none"
     )
 }

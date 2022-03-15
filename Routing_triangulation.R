@@ -46,7 +46,9 @@ obj = 'SDR'; L = 500
 # Create route given points
 solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
   # obj = 'SDR'; L = 500; zone_id = 2
-  map = points[[zone_id]]
+  map = clust$instance$points |>
+    dplyr::filter((id == 1) | (zone == zone_id))
+
   delsgs <- clust$same_zone_edges |>
     dplyr::filter(zone == zone_id) |>
     as_tibble()
@@ -152,7 +154,6 @@ rout <- structure(
   class = "routing"
 )
 
-#################
 plot.routing <- function(rout) {
   route_segments <- rout$routing_results |>
     tidyr::unnest(routes) |>
