@@ -52,14 +52,16 @@ solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
 
   # adapt to correct ids
   lookup <- map |> dplyr::mutate(ind = row_number()) |> select(ind, id)
-  tp$delsgs <- tp$delsgs |>
-    dplyr::inner_join(lookup, by = c("ind1" = "ind")) |>
-    dplyr::select(-ind1, ind1 = id) |>
-    dplyr::inner_join(lookup, by = c("ind2" = "ind")) |>
-    dplyr::select(-ind2, ind2 = id)
+  map <- map |> mutate(ind = row_number(), .before = everything())
+  # tp$delsgs <- tp$delsgs |>
+  #   dplyr::inner_join(lookup, by = c("ind1" = "ind")) |>
+  #   dplyr::select(-ind1, ind1 = id) |>
+  #   dplyr::inner_join(lookup, by = c("ind2" = "ind")) |>
+  #   dplyr::select(-ind2, ind2 = id)
 
-  g <- graph.data.frame(tp$delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = map %>% select(id, score))
-  candidates <- map$id
+
+  g <- graph.data.frame(tp$delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = map %>% select(ind, score))
+  candidates <- map$ind
   route = integer()
   route <- append(route, 1)
   last_in_current <- route[length(route)]
@@ -70,16 +72,17 @@ solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
       d <- vector(length = length(map$id))
       s <- vector(length = length(map$id))
       SDR <- vector(length = length(map$id))
-      for (candidate in candidates) {
-        # print(candidate)
+      # for (candidate in candidates) {
+      for (i in 1:length(candidates)) {
+        print(i)
         # candidate = candidates[3]
         route_temp <- route
-        route_temp <- append(route_temp, candidate, after = length(route_temp)-1)
-        d[candidate] <- dist(route[length(route)], candidate, g = g) +
-          dist(candidate, route[length(route)-1], g = g) -
+        route_temp <- append(route_temp, candidates[i], after = length(route_temp)-1)
+        d[i] <- dist(route[length(route)], candidates[i], g = g) +
+          dist(candidates[i], route[length(route)-1], g = g) -
           as.vector(dist(route[length(route_temp)-2], route_temp[1], g = g))
-        s[candidate] <- map[candidate,]$score
-        SDR[candidate] <- s[candidate]/d[candidate]
+        s[i] <- map[candidates[i],]$score
+        SDR[i] <- s[candidates[i]]/d[candidates[i]]
       }
       New_last <- which.max(SDR)
       all_short_path <- dist2(route[length(route)-1], New_last, g = g)
@@ -98,10 +101,10 @@ solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
       map[New_last,]$score <- 0
       print(New_last)
     }
-    if (dist(last_in_current, New_last, g = g) + dist(New_last, terminal$id[1], g = g) - dist(last_in_current,  terminal$id[1], g = g) < L){
+    if (dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g) < L){
       route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
       # For-loop to remove all new distances, not just the last in new shortest path
-      L <- L + dist(last_in_current, terminal$id[1], g = g)
+      L <- L + dist(last_in_current, 1, g = g)
       L <- L - dist(route[length(route)], route[length(route)-1], g = g)
       if (length(all_short_path > 2)){
         for (i in 1:(length(all_short_path)-1)){
@@ -116,7 +119,7 @@ solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
       if (plot == TRUE){
         plot_obj <- list()
         rout <- list()
-        plot_obj[[1]] <- route
+        plot_obj[[1]] <- lookup$id[route]
         rout$routes <- tibble(agent_id = 1:1, routes = plot_obj)
         rout$instance$points <- test_instances$p7_chao$points
         route_segments <- rout$routes |>
@@ -156,7 +159,7 @@ solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
             fill = "none"
           ) +
         ggplot2::geom_segment(
-          data = tri$delsgs,
+          data = tp$delsgs,
           ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
           color = ggplot2::alpha("black", 0.3), linetype = "dashed"
         )
