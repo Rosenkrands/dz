@@ -56,6 +56,9 @@ dist2 <- function(id1, id2){
 
 # Create route given points
 solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
+  tp <- deldir(x = map$x, y = map$y)
+  tp$delsgs$dist <- sqrt((tp$delsgs$x1 - tp$delsgs$x2)^2 + (tp$delsgs$y1 - tp$delsgs$y2)^2)
+  g <- graph.data.frame(tp$delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = all_points %>% select(id, score))
   candidates <- map$id
   route = integer()
   route <- append(route, terminal$id[1])
