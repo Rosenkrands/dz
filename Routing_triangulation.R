@@ -102,6 +102,7 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
     }
     if (dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g) < L){
       route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
+      all_short_path_return <- dist2(New_last, 1, g = g)
       # For-loop to remove all new distances, not just the last in new shortest path
       L <- L + dist(last_in_current, 1, g = g)
       L <- L - dist(route[length(route)], route[length(route)-1], g = g)
@@ -112,6 +113,7 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
       }
       # print(route)
     } else {
+      route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
       # Switch last two before terminal
       # route <- replace(route, c(length(route)-1, length(route)-2), route[c(length(route)-2, length(route)-1)])
       # Function to plot path using information in route object
@@ -121,6 +123,7 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
   }
 }
 
+<<<<<<< HEAD
 # we want to create a route for each zone
 routing_results <- tibble::tibble(agent_id = 1:clust$k)
 
@@ -154,6 +157,9 @@ rout <- structure(
 plot.routing <- function(rout) {
   rout
 }
+=======
+rout <- solve_routing(zone_id = 1, L = 300)
+>>>>>>> bcc9ece10c6f698d8dc4641bd078a29bda2d41fc
 
 plot_obj <- list()
 # rout <- list()
@@ -201,6 +207,6 @@ ggplot2::ggplot() +
     ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
     color = ggplot2::alpha("black", 0.3), linetype = "dashed"
   )
-
+rout$route
 
 
