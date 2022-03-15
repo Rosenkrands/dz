@@ -280,11 +280,25 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
 
   inst$points <- cl$inst_points
 
+  same_zone_edges <- tri |>
+    dplyr::left_join(
+      clust$instance$points |> dplyr::select(id, zone),
+      by = c("ind1" = "id")
+    ) |>
+    dplyr::left_join(
+      clust$instance$points |> dplyr::select(id, zone),
+      by = c("ind2" = "id")
+    ) |>
+    dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
+    dplyr::mutate(zone = ifelse(is.na(zone.x), zone.y, zone.x)) |>
+    dplyr::select(-c(zone.x,zone.y))
+
   structure(
     list(
       "instance" = inst,
       "k" = k,
       "cluster_method" = cluster_method,
+      "same_zone_edges" = same_zone_edges,
       "plot_data" = cl$plot_data
     ),
     class = "clustering"
@@ -306,20 +320,11 @@ plot.clustering <- function(clust, delaunay = T) {
 
   p <- ggplot2::ggplot()
 
-    # If either delaunay or voronoi is true we compute the triangulation
+  # If either delaunay or voronoi is true we compute the triangulation
   if (delaunay) {
-    tri <- deldir::deldir(clust$instance$points$x, clust$instance$points$y)
-    delsgs_same_zone <- tri$delsgs |>
-      dplyr::left_join(
-        clust$instance$points |> dplyr::select(id, zone),
-        by = c("ind1" = "id")
-      ) |>
-      dplyr::left_join(
-        clust$instance$points |> dplyr::select(id, zone),
-        by = c("ind2" = "id")
-      ) |>
-      dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
-      dplyr::distinct(x1, y1, x2, y2)
+    delsgs_same_zone <- clust$same_zone_edges |>
+      dplyr::select(x1,y1,x2,y2) |>
+      dplyr::distinct()
   }
 
   # Add delaunay edges
@@ -334,10 +339,14 @@ plot.clustering <- function(clust, delaunay = T) {
 
   p +
     # Plot the intermediate node with color according to score
-    ggplot2::geom_point(
+    ggplot2::geom_text(
       data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
-      ggplot2::aes(x, y, color = as.character(zone), shape = point_type)
+      ggplot2::aes(x, y, color = as.character(zone), label = id)
     ) +
+    # ggplot2::geom_point(
+    #   data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
+    #   ggplot2::aes(x, y, color = as.character(zone), shape = point_type)
+    # ) +
     # Plot the terminal nodes
     ggplot2::geom_point(
       data = clust$instance$points |> dplyr::filter(point_type == "terminal"),
@@ -402,18 +411,9 @@ animate_local_search <- function(clust, filename = "animation.gif") {
 
     # If either delaunay or voronoi is true we compute the triangulation
     if (delaunay) {
-      tri <- deldir::deldir(plot_points$x, plot_points$y)
-      delsgs_same_zone <- tri$delsgs |>
-        dplyr::left_join(
-          plot_points |> dplyr::select(id, zone),
-          by = c("ind1" = "id")
-        ) |>
-        dplyr::left_join(
-          plot_points |> dplyr::select(id, zone),
-          by = c("ind2" = "id")
-        ) |>
-        dplyr::filter(zone.x == zone.y) |>
-        dplyr::distinct(x1, y1, x2, y2)
+      delsgs_same_zone <- clust$same_zone_edges |>
+        dplyr::select(x1,y1,x2,y2) |>
+        dplyr::distinct()
     }
 
     # Add delaunay edges
