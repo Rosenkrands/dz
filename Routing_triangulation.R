@@ -114,17 +114,17 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
       # Switch last two before terminal
       # route <- replace(route, c(length(route)-1, length(route)-2), route[c(length(route)-2, length(route)-1)])
       # Function to plot path using information in route object
-      output <- list("route" = route, "L" = L, "s_total" = s_total, "delsgs" = delsgs)
+      output <- list("route" = route, "L" = L, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
       return(output)
     }
   }
 }
 
-rout <- solve_routing(zone_id = 3)
+rout <- solve_routing(zone_id = 4)
 
 plot_obj <- list()
 # rout <- list()
-plot_obj[[1]] <- lookup$id[rout[[1]]]
+plot_obj[[1]] <- rout$lookup$id[rout[[1]]]
 rout$routes <- tibble(agent_id = 1:1, routes = plot_obj)
 rout$instance$points <- test_instances$p7_chao$points
 route_segments <- rout$routes |>
@@ -164,7 +164,7 @@ ggplot2::ggplot() +
     fill = "none"
   ) +
   ggplot2::geom_segment(
-    data = delsgs,
+    data = rout$delsgs,
     ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
     color = ggplot2::alpha("black", 0.3), linetype = "dashed"
   )
