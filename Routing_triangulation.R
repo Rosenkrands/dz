@@ -7,8 +7,6 @@ library(dplyr)
 # For testing purposes:
 # clust <- readRDS("clust_ls.rds")
 
-# Our data
-# terminal <- as.data.frame(test_instances$p7_chao$points %>% filter(point_type == "terminal") %>% select(-'point_type'))[1,]
 clust$instance$points |> dplyr::filter(id == 1) |> dplyr::select(id, x, y, score)
 
 all_points <- clust$instance$points |>
@@ -23,35 +21,8 @@ select_zone <- function(zone_id) {
 
 points <- 1:clust$k |> as.list() |> lapply(select_zone)
 
-# points <- as.data.frame(test_instances$p7_chao$points %>% filter(point_type == "intermediate") %>% select(-'point_type'))
-
-# all_points <- rbind(terminal, points)
-
-# Triangulation
-tp <- deldir(x = all_points$x, y = all_points$y)
-plot(tp)
-
-tp$delsgs$dist <- sqrt((tp$delsgs$x1 - tp$delsgs$x2)^2 + (tp$delsgs$y1 - tp$delsgs$y2)^2)
-
-# Convert to igraph
-g <- graph.data.frame(tp$delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = all_points %>% select(id, score))
-# V(g)$size <- V(g)$score
-# E(g)$width <- E(g)$dist*0.2
-plot(g)
-
-
-### Delaunay insertion
-
-# Distance function using ID
-# Update to only use DT using shortest path algorithm
-# dist <- function(id1, id2){
-#   p1 <- test_instances$p7_chao$points[id1 == test_instances$p7_chao$points$id, c("x","y")]
-#   p2 <- test_instances$p7_chao$points[id2 == test_instances$p7_chao$points$id, c("x","y")]
-#   return(as.numeric(sqrt((p1[1] - p2[1])^2 + (p1[2]-p1[2])^2)))
-# }
-
 # Function for calculating the distance of the shortest (DL) path between 2 points.
-dist <- function(id1, id2){
+dist <- function(id1, id2, g){
   # Find vertices that make up the path
   if (id1 == id2) return(0)
   short_vert <- as.vector(shortest_paths(graph = g, from = id1, to = id2, output = "vpath")$vpath[[1]])
@@ -66,7 +37,7 @@ dist <- function(id1, id2){
 }
 
 # Dist function that returns only the points in the path
-dist2 <- function(id1, id2){
+dist2 <- function(id1, id2, g){
   # Find vertices that make up the path
   if (id1 == id2) return(0)
   short_vert <- as.vector(shortest_paths(graph = g, from = id1, to = id2, output = "vpath")$vpath[[1]])
@@ -75,14 +46,24 @@ dist2 <- function(id1, id2){
 
 # Create route given points
 solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
+  # obj = 'SDR'; L = 100; map = points[[1]]; plot = T
   tp <- deldir(x = map$x, y = map$y)
   tp$delsgs$dist <- sqrt((tp$delsgs$x1 - tp$delsgs$x2)^2 + (tp$delsgs$y1 - tp$delsgs$y2)^2)
-  g <- graph.data.frame(tp$delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = all_points %>% select(id, score))
+
+  # adapt to correct ids
+  lookup <- map |> dplyr::mutate(ind = row_number()) |> select(ind, id)
+  tp$delsgs <- tp$delsgs |>
+    dplyr::inner_join(lookup, by = c("ind1" = "ind")) |>
+    dplyr::select(-ind1, ind1 = id) |>
+    dplyr::inner_join(lookup, by = c("ind2" = "ind")) |>
+    dplyr::select(-ind2, ind2 = id)
+
+  g <- graph.data.frame(tp$delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = map %>% select(id, score))
   candidates <- map$id
   route = integer()
-  route <- append(route, terminal$id[1])
+  route <- append(route, 1)
   last_in_current <- route[length(route)]
-  route <- append(route, terminal$id[1])
+  route <- append(route, 1)
   s_total <- 0
   while (L > 0) {
     if (obj == 'SDR'){
@@ -90,16 +71,18 @@ solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
       s <- vector(length = length(map$id))
       SDR <- vector(length = length(map$id))
       for (candidate in candidates) {
+        # print(candidate)
+        # candidate = candidates[3]
         route_temp <- route
         route_temp <- append(route_temp, candidate, after = length(route_temp)-1)
-        d[candidate] <- dist(route[length(route)], candidate) +
-          dist(candidate, route[length(route)-1]) -
-          as.vector(dist(route[length(route_temp)-2], route_temp[1]))
+        d[candidate] <- dist(route[length(route)], candidate, g = g) +
+          dist(candidate, route[length(route)-1], g = g) -
+          as.vector(dist(route[length(route_temp)-2], route_temp[1], g = g))
         s[candidate] <- map[candidate,]$score
         SDR[candidate] <- s[candidate]/d[candidate]
       }
       New_last <- which.max(SDR)
-      all_short_path <- dist2(route[length(route)-1], New_last)
+      all_short_path <- dist2(route[length(route)-1], New_last, g = g)
       # print(all_short_path[2:length(all_short_path)])
       #print(route)
       # candidates <- candidates[!candidates %in% all_short_path]
@@ -110,19 +93,19 @@ solve_routing <- function(obj = 'SDR', L = 100, map = all_points, plot = T){
     }
     if (obj == 'random'){
       New_last <- sample(2:101, size = 1)
-      all_short_path <- dist2(route[length(route)-1], New_last)
+      all_short_path <- dist2(route[length(route)-1], New_last, g = g)
       s_total <- s_total + map[New_last,]$score
       map[New_last,]$score <- 0
       print(New_last)
     }
-    if (dist(last_in_current, New_last) + dist(New_last, terminal$id[1]) - dist(last_in_current,  terminal$id[1]) < L){
+    if (dist(last_in_current, New_last, g = g) + dist(New_last, terminal$id[1], g = g) - dist(last_in_current,  terminal$id[1], g = g) < L){
       route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
       # For-loop to remove all new distances, not just the last in new shortest path
-      L <- L + dist(last_in_current, terminal$id[1])
-      L <- L - dist(route[length(route)], route[length(route)-1])
+      L <- L + dist(last_in_current, terminal$id[1], g = g)
+      L <- L - dist(route[length(route)], route[length(route)-1], g = g)
       if (length(all_short_path > 2)){
         for (i in 1:(length(all_short_path)-1)){
-          L <- L - dist(all_short_path[length(all_short_path)-i+1], all_short_path[length(all_short_path)-i])
+          L <- L - dist(all_short_path[length(all_short_path)-i+1], all_short_path[length(all_short_path)-i], g = g)
         }
       }
       # print(route)
