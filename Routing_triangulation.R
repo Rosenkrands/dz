@@ -42,6 +42,7 @@ dist2 <- function(id1, id2, g){
   return(short_vert)
 }
 
+obj = 'SDR'; L = 500
 # Create route given points
 solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
   # obj = 'SDR'; L = 500; zone_id = 2
@@ -120,7 +121,39 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
   }
 }
 
-rout <- solve_routing(zone_id = 4)
+# we want to create a route for each zone
+routing_results <- tibble::tibble(agent_id = 1:clust$k)
+
+# Caclculate the routes
+rslt <- lapply(
+  routing_results$agent_id,
+  function(zone_id) {solve_routing(obj = "SDR", L = 300, zone_id = zone_id)}
+)
+
+# then we gather results from the k routes into one data structure
+route_list <- lapply(
+  rslt,
+  function(arg) {arg$lookup$id[arg$route]} # convert from local_id to id
+)
+
+routing_results$routes <- route_list
+routing_results$L <- do.call(c, lapply(rslt, function(arg) {arg$L}))
+routing_results$s_total <- do.call(c, lapply(rslt, function(arg) {arg$s_total}))
+
+rout <- structure(
+  list(
+    "routing_results" = routing_results,
+    "obj" = obj,
+    "L" = L,
+    "clust" = clust
+  ),
+  class = "routing"
+)
+
+#################
+plot.routing <- function(rout) {
+  rout
+}
 
 plot_obj <- list()
 # rout <- list()
