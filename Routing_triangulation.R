@@ -118,6 +118,9 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
     } else {
       # Add route back to base
       route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
+      for (i in 1:length(route)){
+        route[i] <- lookup$id[route[i]]
+      }
       # Switch last two before terminal
       # route <- replace(route, c(length(route)-1, length(route)-2), route[c(length(route)-2, length(route)-1)])
       # Function to plot path using information in route object
