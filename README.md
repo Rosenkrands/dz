@@ -76,12 +76,13 @@ Given an instance with clusters we are able to find a set of routes
 using the `routing` function.
 
 ``` r
-# set.seed(6)
-# 
-# rout <- routing(
-#   clust = clust_gr,
-#   routing_method = "random"
-# )
-# 
-# plot(rout)
+rout <- routing(
+  clust = clust_ls,
+  obj = "SDR",
+  L = 500
+)
+
+plot(rout)
 ```
+
+<img src="man/figures/README-perform_routing-1.png" width="100%" />

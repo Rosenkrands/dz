@@ -42,10 +42,13 @@ dist2 <- function(id1, id2, g){
   return(short_vert)
 }
 
+obj = 'SDR'; L = 500
 # Create route given points
 solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
   # obj = 'SDR'; L = 500; zone_id = 2
-  map = points[[zone_id]]
+  map = clust$instance$points |>
+    dplyr::filter((id == 1) | (zone == zone_id))
+
   delsgs <- clust$same_zone_edges |>
     dplyr::filter(zone == zone_id) |>
     as_tibble()
@@ -124,54 +127,72 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
   }
 }
 
-rout <- solve_routing(zone_id = 1, L = 300)
+# we want to create a route for each zone
+routing_results <- tibble::tibble(agent_id = 1:clust$k)
 
-plot_obj <- list()
-# rout <- list()
-plot_obj[[1]] <- rout$lookup$id[rout[[1]]]
-rout$routes <- tibble(agent_id = 1:1, routes = plot_obj)
-rout$instance$points <- test_instances$p7_chao$points
-route_segments <- rout$routes |>
-  tidyr::unnest(routes) |>
-  dplyr::group_by(agent_id) |>
-  dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
-  dplyr::filter(!is.na(id_start)) |>
-  dplyr::select(-routes) |>
-  dplyr::inner_join(rout$instance$points |> dplyr::select(id, x, y),
-                    by = c("id_start" = "id")) |>
-  dplyr::inner_join(rout$instance$points |> dplyr::select(id, x, y),
-                    by = c("id_end" = "id"), suffix = c("","end"))
+# Caclculate the routes
+rslt <- lapply(
+  routing_results$agent_id,
+  function(zone_id) {solve_routing(obj = "SDR", L = 300, zone_id = zone_id)}
+)
 
-# Plot the segment on the existing plot
-ggplot2::ggplot() +
-  # ggalt::geom_encircle(
-  #   data = rout$in_points,
-  #   ggplot2::aes(x = x, y = y, group = zone, fill = as.character(zone)),
-  #   s_shape = 1, expand = 0, alpha = 0.2
-  # ) +
-  ggplot2::geom_text(
-    data = rout$instance$points |> dplyr::filter(point_type == "intermediate"),
-    ggplot2::aes(x, y, label = id)
-  ) +
-  ggplot2::geom_segment(
-    data = route_segments,
-    ggplot2::aes(x=x, y=y, xend=xend, yend=yend)
-  ) +
-  ggplot2::geom_point(
-    data = rout$instance$points |> dplyr::filter(point_type == "terminal"),
-    ggplot2::aes(x, y), color = "red", shape = 17
-  ) +
-  ggplot2::ggtitle(paste0("Instance: ", rout$instance$name)) +
-  ggplot2::theme_bw() +
-  ggplot2::guides(
-    shape = "none",
-    fill = "none"
-  ) +
-  ggplot2::geom_segment(
-    data = rout$delsgs,
-    ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
-    color = ggplot2::alpha("black", 0.3), linetype = "dashed"
-  )
-rout$route
+# then we gather results from the k routes into one data structure
+route_list <- lapply(
+  rslt,
+  function(arg) {arg$lookup$id[arg$route]} # convert from local_id to id
+)
 
+routing_results$routes <- route_list
+routing_results$L <- do.call(c, lapply(rslt, function(arg) {arg$L}))
+routing_results$s_total <- do.call(c, lapply(rslt, function(arg) {arg$s_total}))
 
+rout <- structure(
+  list(
+    "routing_results" = routing_results,
+    "obj" = obj,
+    "L" = L,
+    "clustering" = clust
+  ),
+  class = "routing"
+)
+
+plot.routing <- function(rout) {
+  route_segments <- rout$routing_results |>
+    tidyr::unnest(routes) |>
+    dplyr::group_by(agent_id) |>
+    dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
+    dplyr::filter(!is.na(id_start)) |>
+    dplyr::select(-routes) |>
+    dplyr::inner_join(rout$clustering$instance$points |> dplyr::select(id, x, y),
+                      by = c("id_start" = "id")) |>
+    dplyr::inner_join(rout$clustering$instance$points |> dplyr::select(id, x, y),
+                      by = c("id_end" = "id"), suffix = c("","end"))
+
+  # Plot the segment on the existing plot
+  ggplot2::ggplot() +
+    ggplot2::geom_segment(
+      data = clust$same_zone_edges,
+      ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+      color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+    ) +
+    ggplot2::geom_point(
+      data = rout$clustering$instance$points |> dplyr::filter(point_type == "terminal"),
+      ggplot2::aes(x, y), color = "red", shape = 17
+    ) +
+    ggplot2::geom_point(
+      data = rout$clustering$instance$points |> dplyr::filter(point_type == "intermediate"),
+      ggplot2::aes(x, y, color= as.character(zone))
+    ) +
+    ggplot2::geom_segment(
+      data = route_segments,
+      ggplot2::aes(x=x, y=y, xend=xend, yend=yend)
+    ) +
+    ggplot2::ggtitle(paste0("Instance: ", rout$clustering$instance$name)) +
+    ggplot2::theme_bw() +
+    ggplot2::guides(
+      shape = "none",
+      fill = "none",
+      color = "none"
+    )
+
+}

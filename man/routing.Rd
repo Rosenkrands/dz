@@ -4,12 +4,14 @@
 \alias{routing}
 \title{Generate routes for a clustered instance}
 \usage{
-routing(clust, routing_method = "random")
+routing(clust, obj = "SDR", L = 500)
 }
 \arguments{
 \item{clust}{A list returned from the `clustering` function}
 
-\item{routing_method}{A method from which to perform the routing}
+\item{obj}{The objective to use for the routing}
+
+\item{L}{The range constraint induced on the agents}
 }
 \value{
 A list

@@ -8,6 +8,8 @@
 }
 \arguments{
 \item{clust}{A list returned from the `clustering` function}
+
+\item{delaunay}{Whether to show delaunay edges on the plot}
 }
 \value{
 A ggplot object

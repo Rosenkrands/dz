@@ -310,6 +310,7 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
 #' Visualizes the zones obtained from the specific clustering algorithm.
 #'
 #' @param clust A list returned from the `clustering` function
+#' @param delaunay Whether to show delaunay edges on the plot
 #'
 #' @return A ggplot object
 #' @export
@@ -339,9 +340,9 @@ plot.clustering <- function(clust, delaunay = T) {
 
   p +
     # Plot the intermediate node with color according to score
-    ggplot2::geom_text(
+    ggplot2::geom_point(
       data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
-      ggplot2::aes(x, y, color = as.character(zone), label = id)
+      ggplot2::aes(x, y, color = as.character(zone))
     ) +
     # ggplot2::geom_point(
     #   data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
