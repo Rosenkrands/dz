@@ -95,6 +95,8 @@ The animation is created using `animate_local_search(clust_ls)`.
 Given an instance with clusters we are able to find a set of routes using the `routing` function.
 
 ```{r perform_routing, cache = T}
+# clust_ls <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
+
 rout <- routing(
   clust = clust_ls,
   obj = "SDR",

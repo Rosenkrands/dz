@@ -76,6 +76,8 @@ Given an instance with clusters we are able to find a set of routes
 using the `routing` function.
 
 ``` r
+# clust_ls <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
+
 rout <- routing(
   clust = clust_ls,
   obj = "SDR",

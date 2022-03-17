@@ -9,9 +9,9 @@
 #' @return A list
 #' @export
 #'
-routing <- function(clust, obj = "SDR", L = 500) {
+routing <- function(clust, obj = "SDR", L = 500, variances) {
   # For testing purposes:
-  # clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
+  # clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500; variances = generate_variances(inst = clust$instance)
 
   # Function for calculating the distance of the shortest (DL) path between 2 points.
   dist <- function(id1, id2, g){
@@ -51,6 +51,7 @@ routing <- function(clust, obj = "SDR", L = 500) {
     # adapt to correct ids
     lookup <- map |> dplyr::mutate(local_id = dplyr::row_number()) |> dplyr::select(local_id, id)
     map <- map |> dplyr::mutate(local_id = dplyr::row_number(), .before = dplyr::everything())
+
     delsgs <- delsgs |>
       dplyr::inner_join(lookup, by = c("ind1" = "id")) |>
       dplyr::select(-ind1, ind1 = local_id) |>
@@ -81,7 +82,7 @@ routing <- function(clust, obj = "SDR", L = 500) {
             dist(candidates[i], route[length(route)-1], g = g) -
             as.vector(dist(route[length(route_temp)-2], route_temp[1], g = g))
           s[i] <- map[candidates[i],]$score
-          SDR[i] <- s[candidates[i]]/d[candidates[i]]
+          SDR[i] <- s[i]/d[i]
         }
         New_last <- which.max(SDR)
         all_short_path <- dist2(route[length(route)-1], New_last, g = g)
