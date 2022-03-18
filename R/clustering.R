@@ -272,7 +272,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
     return(
       list(
         "inst_points" = inst$points |>
-          dplyr::select(id, point_type, x, y, score) |>
+          dplyr::select(id, point_type, x, y, score, score_variance) |>
           dplyr::left_join(
             tibble::tibble(zone = 1:k, id = zones) |>
               tidyr::unnest(cols = id) |>
@@ -330,7 +330,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
 #'
 plot.clustering <- function(clust, delaunay = T) {
   # For testing purposes:
-  # clust <- clustering(inst = test_instances$p7_chao, k = 4, cluster_method = "greedy")
+  # clust <- clustering(inst = test_instances$p7_chao, k = 4, cluster_method = "local_search", variances = generate_variances(test_instances$p7_chao))
 
   p <- ggplot2::ggplot()
 
@@ -354,8 +354,10 @@ plot.clustering <- function(clust, delaunay = T) {
   p +
     # Plot the intermediate node with color according to score
     ggplot2::geom_point(
-      data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
-      ggplot2::aes(x, y, color = as.character(zone))
+      data = clust$instance$points |>
+        dplyr::filter(point_type == "intermediate") |>
+        dplyr::mutate(zone = factor(zone)),
+      ggplot2::aes(x, y, color = zone, size = score, alpha = score_variance)
     ) +
     # ggplot2::geom_point(
     #   data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
@@ -372,7 +374,9 @@ plot.clustering <- function(clust, delaunay = T) {
     ggplot2::guides(
       shape = "none",
       fill = "none",
-      color = "none"
+      color = "none",
+      alpha = "none",
+      size = "none"
     )
 }
 
