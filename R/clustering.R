@@ -119,12 +119,6 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
 
     # wrapper for the cluster eval function to restrict to a single argument
     cluster_eval <- function(zone) {
-      # cpp version of the calculation
-      # cluster_eval_cpp(
-      #   zone,
-      #   inst = inst$points |> dplyr::select(id,x,y,score) |> data.matrix()
-      # )
-
       dst_temp <- dst[zone, zone] # subset the distance matrix (of shortest paths) to only nodes in the zone
       avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)]) # dst_temp is symmetric so we only need the lower triange (or equivalently upper) not including the diagonal (of all zeroes corresponding to all loop edges)
       total_profit <- sum(inst$points$score[zone]) # get the total profit from the instance table
@@ -431,9 +425,18 @@ animate_local_search <- function(clust, filename = "animation.gif") {
 
     # If either delaunay or voronoi is true we compute the triangulation
     if (delaunay) {
-      delsgs_same_zone <- clust$same_zone_edges |>
-        dplyr::select(x1,y1,x2,y2) |>
-        dplyr::distinct()
+      tri <- deldir::deldir(clust$instance$points$x, clust$instance$points$y)
+      delsgs_same_zone <- tri$delsgs |>
+        dplyr::left_join(
+          plot_points |> dplyr::select(id, zone),
+          by = c("ind1" = "id")
+        ) |>
+        dplyr::left_join(
+          plot_points |> dplyr::select(id, zone),
+          by = c("ind2" = "id")
+        ) |>
+        dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
+        dplyr::distinct(x1, y1, x2, y2)
     }
 
     # Add delaunay edges
