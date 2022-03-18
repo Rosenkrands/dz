@@ -3,15 +3,20 @@
 #' Given an instance, number of clusters and a clustering method the function assigns each node of the problem instance a zone.
 #'
 #' @param inst An object returned from the `instance` function
+#' @param variances
 #' @param k The number of clusters
 #' @param cluster_method The method with which to perform the clustering
 #'
 #' @return A list ...
 #' @export
 #'
-clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
+clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_search")) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"
+  # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"; variances = generate_variances(inst)
+
+  inst$points <- inst$points |>
+    dplyr::left_join(variances, by = c("id")) |> # Join variances on points tibble
+    dplyr::filter(dplyr::row_number() != nrow(inst$points)) # Remove the last point (node 1 will be source and sink)
 
   # Save only the intermediate points for clustering
   in_points <- inst$points |> dplyr::filter(point_type == "intermediate")
@@ -19,11 +24,17 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
   # Compute edges in delaunay triangulation
   tri <- (deldir::deldir(inst$points$x, inst$points$y))$delsgs
 
-  # calculate distance matrix
-  dst <- Rfast::Dist(
-    inst$points |> dplyr::select(x,y),
-    method = "euclidean"
+  # construct the igraph object
+  tri$dist <- sqrt((tri$x1 - tri$x2)^2 + (tri$y1 - tri$y2)^2)
+
+  g <- igraph::graph.data.frame(
+    tri |> dplyr::select(ind1, ind2, weight = dist),
+    directed = FALSE,
+    vertices = inst$points |> dplyr::select(id, score)
   )
+
+  # calculate distance matrix
+  dst <- igraph::distances(g)
 
   greedy_clustering <- function() {
     # add the source node to each zone
@@ -42,44 +53,46 @@ clustering <- function(inst, k, cluster_method = c("greedy", "local_search")) {
         # assign nearest point to each zone
         points_in_zone <- zones[[i]]
 
-        # if (length(zones[[4]]) == 16) stop("we are here!")
-
+        # print("finding the neighborhood")
         # Find the delaunay neighbors
-        nghbr <- tri |>
-          dplyr::filter((ind1 %in% unassigned$id) | (ind2 %in% unassigned$id)) |>
-          dplyr::filter(
-            ((ind1 %in% points_in_zone) & !(ind2 %in% points_in_zone)) |
-              ((ind2 %in% points_in_zone) & !(ind1 %in% points_in_zone))
-          ) |>
-          dplyr::select(ind1, ind2) |>
-          tidyr::pivot_longer(cols = c(ind1, ind2), names_to = NULL, values_to = "id") |>
-          dplyr::filter(!(id %in% points_in_zone)) |>
-          dplyr::distinct() |>
-          dplyr::pull(id)
+        nghbr <- do.call(
+          c,
+          lapply(
+            igraph::neighborhood(g, order = 1, nodes = points_in_zone),
+            as.vector
+          )
+        ) |> unique()
+
+        nghbr <- nghbr[nghbr %in% unassigned$id]
 
         # if there are no neighbors go to next iteration
         if (length(nghbr) < 1) next
 
-        # find the closest point
-        closest_points <- expand.grid(id1 = points_in_zone, id2 = nghbr) |>
-          dplyr::rowwise() |>
-          dplyr::mutate(dist = dst[id1, id2]) |>
-          dplyr::ungroup() |>
-          dplyr::slice_min(dist, n = 1, with_ties = F) |>
-          dplyr::pull(id2)
+        # Lookup distances in the distance matrix, while removing loops (rows are neighbors, columns are points in zone)
+        dst_temp <- dst[nghbr, points_in_zone] |> as.matrix()
+        if (length(nghbr) == 1) dst_temp <- t(dst_temp) # If there is only one neighbor and multiple points in zone, rows and columns are switched
 
-        # add to zone
-        zones[[i]] <- append(zones[[i]], closest_points)
+        # return the first minimum distance and add to zone
+
+        # first minimum distance (first column in neighbors, second columns is points in zone)
+        closest_point <- nghbr[arrayInd(which.min(dst_temp), dim(dst_temp))[,1]]
+        # print(paste0("closest point is ", closest_point))
+        if(is.na(closest_point)) stop("closest point is NA")
+
+        zones[[i]] <- append(
+          zones[[i]],
+          closest_point
+        )
 
         # update unassigned
-        unassigned <- unassigned |> dplyr::filter(!(id %in% closest_points))
+        unassigned <- unassigned |> dplyr::filter(id != closest_point)
       }
     }
     cat("unassigned points: 0\nall done!")
 
     # add the sink node to each zone
     for (i in 1:k) {
-      zones[[i]] <- append(zones[[i]], nrow(inst$points))
+      zones[[i]] <- append(zones[[i]], 1)
     }
 
     return(
