@@ -6,13 +6,14 @@
 #' @param variances
 #' @param k The number of clusters
 #' @param cluster_method The method with which to perform the clustering
+#' @param alpha weight between mean distance/total profit and total variance/total profit
 #'
 #' @return A list ...
 #' @export
 #'
-clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_search")) {
+clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"; variances = generate_variances(inst)
+  # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 1
 
   inst$points <- inst$points |>
     dplyr::left_join(variances, by = c("id")) |> # Join variances on points tibble
@@ -88,7 +89,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
         unassigned <- unassigned |> dplyr::filter(id != closest_point)
       }
     }
-    cat("unassigned points: 0\nall done!")
+    cat("unassigned points: 0\nall done!\n")
 
     # add the sink node to each zone
     for (i in 1:k) {
@@ -122,8 +123,20 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
       dst_temp <- dst[zone, zone] # subset the distance matrix (of shortest paths) to only nodes in the zone
       avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)]) # dst_temp is symmetric so we only need the lower triange (or equivalently upper) not including the diagonal (of all zeroes corresponding to all loop edges)
       total_profit <- sum(inst$points$score[zone]) # get the total profit from the instance table
+      total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
 
-      avg_dist/total_profit
+      # For testing
+      # x <- seq(-4,4,.01)*sqrt(total_variance) + total_profit
+      # prob <- pnorm(x, mean = total_profit, sd = sqrt(total_variance))
+      #
+      # plot(x, prob, type = "l")
+
+      p <- .05
+      q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
+
+      # abline(h = p, lty = 2); abline(v = q, lty = 2)
+
+      alpha*(avg_dist/total_profit) + (1-alpha)*(avg_dist/q)
     }
 
     # Operators for the local search (for now there is only insertion)
@@ -177,9 +190,9 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
 
       best_insert <- NA
       best_insert_obj <- Inf
-      cat("\n")
+      # cat("\n")
       for (i in 1:nrow(candidates)) {
-        cat("candidates left:", nrow(candidates) - i, "\r")
+        # cat("candidates left:", nrow(candidates) - i, "\r")
         id <- candidates[i,] |> dplyr::pull(id)
         zone_id <- candidates[i,] |> dplyr::pull(zone_id)
 
@@ -189,14 +202,6 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
           best_insert <- candidates[i,]
         }
       }
-
-      # best_insert <- candidates |>
-      #   dplyr::rowwise() |>
-      #   dplyr::mutate(objective = insert_eval(id, zone_id)) |>
-      #   dplyr::ungroup() |>
-      #   dplyr::slice_min(objective, n = 1, with_ties = F)
-
-      # print(best_insert)
 
       # find where the point is coming from and remove it
       for (i in 1:k) {
@@ -252,7 +257,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
         # saving data for the zone animation
         zones_list[[iter + 1]] <- zones
 
-        cat("objective:", bks_obj, "\titeration:", iter)
+        cat("objective:", bks_obj, "\titeration:", iter, "\r")
       } else {
         ls_obj[iter + 1] <- ls_obj[iter]
         zones_list[[iter + 1]] <- zones_list[[iter]]
@@ -359,10 +364,6 @@ plot.clustering <- function(clust, delaunay = T) {
         dplyr::mutate(zone = factor(zone)),
       ggplot2::aes(x, y, color = zone, size = score, alpha = score_variance)
     ) +
-    # ggplot2::geom_point(
-    #   data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
-    #   ggplot2::aes(x, y, color = as.character(zone), shape = point_type)
-    # ) +
     # Plot the terminal nodes
     ggplot2::geom_point(
       data = clust$instance$points |> dplyr::filter(point_type == "terminal"),
