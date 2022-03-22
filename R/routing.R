@@ -13,6 +13,9 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
   # For testing purposes:
   # clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500; variances = generate_variances(inst = clust$instance)
 
+  # reuse igraph created during clustering
+  g <- clust$g
+
   # Function for calculating the distance of the shortest (DL) path between 2 points.
   dist <- function(id1, id2, g){
     # Find vertices that make up the path
@@ -128,16 +131,156 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
   routing_results <- tibble::tibble(agent_id = 1:clust$k)
 
   # calculate the routes
-  rslt <- lapply(
+  initial_routes <- lapply(
     routing_results$agent_id,
-    function(zone_id) {solve_routing(obj = "SDR", L = 300, zone_id = zone_id)}
+    function(zone_id) {solve_routing(obj = "SDR", L = 100, zone_id = zone_id)}
   )
 
-  # then we gather results from the k routes into one data structure
-  route_list <- lapply(
-    rslt,
+  initial_routes_list <- lapply(
+    initial_routes,
     function(arg) {arg$lookup$id[arg$route]} # convert from local_id to id
   )
+
+  # function to plot progress of routing
+  plot_progress <- function(routes = initial_routes_list,
+                            route,
+                            id_now,
+                            id_next) {
+    route_segments <- tibble::tibble(agent_id = 1:clust$k) |>
+      dplyr::mutate(routes = routes) |>
+      tidyr::unnest(routes) |>
+      dplyr::group_by(agent_id) |>
+      dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
+      dplyr::filter(!is.na(id_start)) |>
+      dplyr::select(-routes) |>
+      dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
+                        by = c("id_start" = "id")) |>
+      dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
+                        by = c("id_end" = "id"), suffix = c("","end"))
+
+    # Plot the segment on the existing plot
+    ggplot2::ggplot() +
+      ggplot2::geom_segment(
+        data = clust$same_zone_edges,
+        ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+        color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+      ) +
+      # Plot points and dots
+      # ggplot2::geom_point(
+      #   data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
+      #   ggplot2::aes(x, y, color= as.character(zone))
+      # ) +
+      # Plot points as ids
+      ggplot2::geom_text(
+        data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
+        ggplot2::aes(x, y, color= as.character(zone), label = id)
+      ) +
+      ggplot2::geom_segment(
+        data = route_segments,
+        ggplot2::aes(x=x, y=y, xend=xend, yend=yend),
+        linetype = "dashed"
+      ) +
+      ggplot2::geom_point(
+        data = clust$instance$points |> dplyr::filter(point_type == "terminal"),
+        ggplot2::aes(x, y), color = "red", shape = 17
+      ) +
+      ggplot2::ggtitle(paste0("Instance: ", clust$instance$name)) +
+      ggplot2::theme_bw() +
+      ggplot2::guides(
+        shape = "none",
+        fill = "none",
+        color = "none"
+      )
+  }
+
+  update_routing <- function(r = 100, zone_id = 1) {
+    # r = 100; zone_id = 1
+    sub_g <- igraph::induced_subgraph(g, vids = clust$cl$zones[[zone_id]])
+
+    # plotting
+    plot_progress(updated_routes = NULL)
+
+    # map to stick with current notation
+    map <- clust$instance$points
+    edges <- clust$same_zone_edges |> dplyr::filter(zone == zone_id)
+
+    route <- initial_routes_list[[zone_id]]
+
+    # 1. Calculate distance from current line segment to other nodes
+    for (node_nr in 1:(length(route)-2)){
+      # Get nodes with edges to this node
+      id_now <- route[node_nr]
+      id_next <- route[node_nr+1]
+      map$score_variance[id_next] <- 0
+      current_line <- edges |> dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
+      remaining_nodes <- route[(node_nr+2):(length(route))]
+      l <- 0
+      dist_to_edge <- vector()
+      candidates <- integer(0)
+      for (node in remaining_nodes) {
+        #Get their coordinates
+        l <- l+1
+        if (node %in% edges$ind1){
+          point <- unique(edges |> dplyr::filter(ind1 == node) |> dplyr::select(x1, y1))
+        } else {
+          point <- unique(edges |> dplyr::filter(ind2 == node) |> dplyr::select(x1 = x2, y1 = y2))
+        }
+        dist_to_edge[l] <- distancePointSegment(px = point$x1, py <- point$y1, x1 = current_line$x1, x2 = current_line$x2, y1 = current_line$y1, y2 = current_line$y2)
+        if (dist_to_edge[l] < r){
+          # Nodes on path within viewing distance
+          candidates <- append(candidates, node)
+        }
+      }
+      # Use the candidates to evaluate different routes, loop for all possible:
+      # 1. Length of new route
+      # 3. Trade-off
+      #g <- graph.data.frame(delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = all_points %>% select(local_id, score))
+      s_total <- 0
+      d <- vector(length = length(map$id))
+      s <- vector(length = length(map$id))
+      SDR <- vector(length = length(map$id))
+      for (i in 1:length(candidates)) {
+        route_temp <- route
+        route_temp <- append(route_temp, candidates[i], after = match(id_next, route))
+        route_temp <- route_temp[-(match(id_next, route_temp)+2)]
+        d[i] <- dist(route[length(route)], candidates[i], g = g) +
+          dist(candidates[i], id_next, g = g)
+        # Realized score
+        s[i] <- (map$score_variance)[candidates[i]]
+        # Updated SDR
+        SDR[candidates[i]] <- s[i]/d[i]
+      }
+      New_point <- which.max(SDR)
+      # Chose best new route if it is better than original
+      d_temp <- vector()
+      s_temp <- vector()
+      for (i in (match(id_next, route)):((length(route))-1)){
+        d_temp[i] <- dist(route[i], route[i+1], g = g)
+        s_temp[i] <- (map$score)[route[i+1]]
+      }
+      d_expected <- sum(d_temp, na.rm = T)
+      s_expected <- sum(s_temp, na.rm = T)
+      SDR_expected <- s_expected/d_expected
+      if (max(SDR, na.rm = TRUE) > SDR_expected){
+        # Connect to the remainder of original path
+        new_all_short_path <- dist2(id_next, New_point, g = g)
+        route <- route[-(match(id_next, route)+2)]
+        for (node in (new_all_short_path[2:length(new_all_short_path)])) {
+          s_total <- s_total + map[node,]$score
+          map[node,]$score <- 0
+        }
+      }
+    }
+  }
+
+
+  # update routes based on realized values from the uncertainty
+  map <- clust$instance$points %>%
+    dplyr::left_join(variances, by = c("id"))
+
+
+
+  # then we gather results from the k routes into one data structure
 
   routing_results$routes <- route_list
   routing_results$L <- do.call(c, lapply(rslt, function(arg) {arg$L}))

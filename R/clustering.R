@@ -345,6 +345,8 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
       "k" = k,
       "cluster_method" = cluster_method,
       "cl" = cl,
+      "g" = g,
+      "edges" = tri,
       "same_zone_edges" = same_zone_edges,
       "plot_data" = cl$plot_data
     ),
