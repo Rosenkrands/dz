@@ -33,6 +33,31 @@ edges <- tri
 #   edges$ind2[i] <- route_info$lookup$id[edges$ind2[i]]
 # }
 
+### Function for route length
+route_length <- function(route) {
+  distance_temp <- vector(length = length(route)-1)
+  for (placement in (1):(length(route)-1)) {
+    distance_temp[placement] <- dist(route[placement], route[placement + 1], g = g)
+  }
+  return(sum(distance_temp))
+}
+
+### Function for route score
+route_score <- function(route, id_next) {
+  score_temp_realized <- vector(length = match(id_next, route))
+  score_temp_expected <- vector(length = (length(route) - (match(id_next, route))))
+  for (placement in (1):(length(score_temp_realized)-1)) {
+    score_temp_realized[placement] <- map$score_variance[placement]
+  }
+  for (placement in (1):(length(score_temp_expected)-1)) {
+    score_temp_expected[placement] <- map$score[placement]
+  }
+  return(sum(score_temp_realized, na.rm = T)+sum(score_temp_expected, na.rm = T))
+}
+
+
+# Use these in the loop below to improve SDR for the path as actual score is discovered
+
 ### Changes to the path
 # Evaluation of whether the existing path is worth updating
 r <- 1000
@@ -41,14 +66,21 @@ for (node_nr in 1:(length(route)-2)){
   # Get nodes with edges to this node
   id_now <- route[node_nr]
   id_next <- route[node_nr+1]
+  if (id_now == id_next) {
+    node_nr = node_nr + 1
+    id_now <- route[node_nr]
+    id_next <- route[node_nr+1]
+  }
   print(id_next)
   map$score_variance[id_next] <- 0
+  map$score[id_next] <- 0
   current_line <- edges %>% dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
-  remaining_nodes <- route[(node_nr+2):(length(route))]
+  #remaining_nodes <- route[(node_nr+2):(length(route))]
+  nodes_in_zone <- (map %>% filter(zone == 1))$id
   l <- 0
   dist_to_edge <- vector()
   candidates <- integer(0)
-  for (node in remaining_nodes) {
+  for (node in nodes_in_zone) {
     #Get their coordinates
     l <- l+1
     if (node %in% edges$ind1){
@@ -74,20 +106,23 @@ for (node_nr in 1:(length(route)-2)){
     route_temp <- route
     route_temp <- append(route_temp, candidates[i], after = match(id_next, route))
     route_temp <- route_temp[-(match(id_next, route_temp)+2)]
-    d[i] <- dist(route[length(route)], candidates[i], g = g) +
-      dist(candidates[i], id_next, g = g)
+    # d[i] <- dist(route[length(route)], candidates[i], g = g) +
+      # dist(candidates[i], id_next, g = g)
+    d[i] <- route_length(route = route_temp)
     # Realized score
-    s[i] <- (map$score_variance)[candidates[i]]
+    # s[i] <- (map$score_variance)[candidates[i]]
+    s[i] <- route_score(route = route_temp, id_next = id_next)
     # Updated SDR
     SDR[candidates[i]] <- s[i]/d[i]
   }
+  SDR[id_next] <- 0
   New_point <- which.max(SDR)
   # Chose best new route if it is better than original
   d_temp <- vector()
   s_temp <- vector()
   for (i in (match(id_next, route)):((length(route))-1)){
     d_temp[i] <- dist(route[i], route[i+1], g = g)
-    s_temp[i] <- (map$score)[route[i+1]]
+    s_temp[i] <- (map$score_variance)[route[i+1]]
   }
   d_expected <- sum(d_temp, na.rm = T)
   s_expected <- sum(s_temp, na.rm = T)
