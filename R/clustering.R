@@ -136,7 +136,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
 
       # abline(h = p, lty = 2); abline(v = q, lty = 2)
 
-      alpha*(avg_dist/total_profit) + (1-alpha)*(avg_dist/-total_variance)
+      alpha*(avg_dist/total_profit) + (1-alpha)*(avg_dist/q)
     }
 
     # Operators for the local search (for now there is only insertion)
@@ -295,11 +295,15 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
       avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)])
       total_profit <- sum(inst$points$score[zone])
       total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
+      p <- .05
+      q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
 
-      c("profit" = total_profit, "variance" = total_variance, "avg_dist" = avg_dist)
+      tibble::tibble("profit" = total_profit, "q" = q, "avg_dist" = avg_dist)
     }
 
-    obj <- Reduce(`+`, lapply(zones, cluster_eval2))
+    obj <- do.call(dplyr::bind_rows, lapply(zones, cluster_eval2)) |>
+      dplyr::summarise("avg_dist / total_profit" = sum(avg_dist/profit),
+                       "avg_dist / q" = sum(avg_dist/q))
 
     return(
       list(
