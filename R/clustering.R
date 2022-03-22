@@ -136,12 +136,12 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
 
       # abline(h = p, lty = 2); abline(v = q, lty = 2)
 
-      alpha*(avg_dist/total_profit) + (1-alpha)*(avg_dist/q)
+      alpha*(avg_dist/total_profit) + (1-alpha)*(avg_dist/-total_variance)
     }
 
     # Operators for the local search (for now there is only insertion)
     # take a point from one cluster and add it to another
-    insertion <- function(zones) {
+    insertion <- function(zones, bks_obj) {
 
       # Update zones for generating the candidates
       inst_temp <- inst$points |>
@@ -168,6 +168,13 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
         dplyr::select(id = id1, zone_id) |>
         dplyr::distinct()
 
+      # Check if a zone is connected
+      connected <- function(zone) {
+        # zone <- zones[[1]]
+        sub_g <- igraph::induced_subgraph(g, vids = zone)
+        igraph::is_connected(sub_g, mode = "weak") # check for undirected path between pairs of vertices
+      }
+
       # Calculate the resulting objective of performing the insertion
       insert_eval <- function(id, zone_id) {
         # find where the point is coming from and remove it
@@ -185,11 +192,16 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
           after = length(zones[[zone_id]]) - 1
         )
 
-        do.call(sum, lapply(zones, cluster_eval))
+        # check if zones are connected
+        if (!all(do.call(c, lapply(zones, connected)))) {
+          return(Inf)
+        }
+
+        return(do.call(sum, lapply(zones, cluster_eval)))
       }
 
       best_insert <- NA
-      best_insert_obj <- Inf
+      best_insert_obj <- bks_obj
       # cat("\n")
       for (i in 1:nrow(candidates)) {
         # cat("candidates left:", nrow(candidates) - i, "\r")
@@ -200,8 +212,11 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
         if (candidate_obj < best_insert_obj) {
           best_insert_obj <- candidate_obj
           best_insert <- candidates[i,]
+          break # continue only until a better candidate is found
         }
       }
+
+      if (best_insert_obj == bks_obj) return(zones) # if no better candidate was found return the original zones
 
       # find where the point is coming from and remove it
       for (i in 1:k) {
@@ -221,7 +236,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
         after = length(zones[[best_insert$zone_id]]) - 1
       )
 
-      zones
+      return(zones)
     }
 
     # local search part
@@ -244,7 +259,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
     iter = 0
     while(T) {
       iter = iter + 1
-      new_zones <- insertion(zones)
+      new_zones <- insertion(zones, bks_obj)
       new_obj <- do.call(sum, lapply(new_zones, cluster_eval))
 
       if (new_obj < bks_obj) {
@@ -261,7 +276,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
       } else {
         ls_obj[iter + 1] <- ls_obj[iter]
         zones_list[[iter + 1]] <- zones_list[[iter]]
-        cat("\nlocal search conclude with bks:", bks_obj)
+        cat("\nlocal search conclude with bks:", bks_obj, "\n")
         break
       }
 
@@ -274,6 +289,18 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
     # Adjust iter_max if local search concluded
     iter_max <- iter
 
+    # Final objective for profit and variance
+    cluster_eval2 <- function(zone) {
+      dst_temp <- dst[zone, zone]
+      avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)])
+      total_profit <- sum(inst$points$score[zone])
+      total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
+
+      c("profit" = total_profit, "variance" = total_variance, "avg_dist" = avg_dist)
+    }
+
+    obj <- Reduce(`+`, lapply(zones, cluster_eval2))
+
     return(
       list(
         "inst_points" = inst$points |>
@@ -285,6 +312,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
             by = c("id" = "id")
           ),
         "zones" = zones,
+        "obj" = obj,
         "plot_data" = list("obj" = ls_obj, "zones" = zones_list, "iter_max" = iter_max)
       )
     )
@@ -316,6 +344,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
       "instance" = inst,
       "k" = k,
       "cluster_method" = cluster_method,
+      "cl" = cl,
       "same_zone_edges" = same_zone_edges,
       "plot_data" = cl$plot_data
     ),

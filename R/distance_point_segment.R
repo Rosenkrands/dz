@@ -1,5 +1,15 @@
-library(tidyverse)
-
+#' Calculate distance from point to line segment
+#'
+#' @param px x-coordinate for point
+#' @param py y-coordinate for point
+#' @param x1 x-coordinate for the first point from the line segement
+#' @param y1 y-coordinate for the first point from the line segement
+#' @param x2 x-coordinate for the second point from the line segement
+#' @param y2 y-coordinate for the second point from the line segement
+#'
+#' @return numeric value
+#' @export
+#'
 distancePointSegment <- function(px, py, x1, y1, x2, y2) {
   ## px,py is the point to test.
   ## x1,y1,x2,y2 is the line to check distance.
@@ -35,12 +45,12 @@ distancePointSegment <- function(px, py, x1, y1, x2, y2) {
   ans
 }
 
-x1 <- .25; y1 <- 0.25; x2 <- .75; y2 <- .75
-
-expand.grid(x = seq(0,1,.01), y = seq(0,1,.01)) |>
-  tibble::as_tibble() |>
-  dplyr::rowwise() |>
-  dplyr::mutate(dist_to_line = ifelse(distancePointSegment(x,y,x1,y1,x2,y2) < .1, 1, 0)) |>
-  ggplot() +
-  geom_point(aes(x, y, color = dist_to_line), shape = 3) +
-  coord_fixed() + theme_void() + guides(color = "none")
+# x1 <- .25; y1 <- 0.25; x2 <- .75; y2 <- .75
+#
+# expand.grid(x = seq(0,1,.01), y = seq(0,1,.01)) |>
+#   tibble::as_tibble() |>
+#   dplyr::rowwise() |>
+#   dplyr::mutate(dist_to_line = ifelse(distancePointSegment(x,y,x1,y1,x2,y2) < .1, 1, 0)) |>
+#   ggplot() +
+#   geom_point(aes(x, y, color = dist_to_line), shape = 3) +
+#   coord_fixed() + theme_void() + guides(color = "none")

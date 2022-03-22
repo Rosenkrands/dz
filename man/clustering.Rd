@@ -4,7 +4,13 @@
 \alias{clustering}
 \title{Generate clusters based on an instance}
 \usage{
-clustering(inst, k, cluster_method = c("greedy", "local_search"))
+clustering(
+  inst,
+  variances,
+  k,
+  cluster_method = c("greedy", "local_search"),
+  alpha = 1
+)
 }
 \arguments{
 \item{inst}{An object returned from the `instance` function}
@@ -12,6 +18,8 @@ clustering(inst, k, cluster_method = c("greedy", "local_search"))
 \item{k}{The number of clusters}
 
 \item{cluster_method}{The method with which to perform the clustering}
+
+\item{alpha}{weight between mean distance/total profit and total variance/total profit}
 }
 \value{
 A list ...
