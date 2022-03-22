@@ -21,7 +21,7 @@ g <- igraph::graph.data.frame(
 )
 
 # Solution information
-route_info <- solve_routing()
+route_info <- solve_routing(L=300)
 route <- route_info$route
 edges <- tri
 
@@ -35,12 +35,13 @@ edges <- tri
 
 ### Changes to the path
 # Evaluation of whether the existing path is worth updating
-r <- 100
+r <- 1000
 # 1. Calculate distance from current line segment to other nodes
 for (node_nr in 1:(length(route)-2)){
   # Get nodes with edges to this node
   id_now <- route[node_nr]
   id_next <- route[node_nr+1]
+  print(id_next)
   map$score_variance[id_next] <- 0
   current_line <- edges %>% dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
   remaining_nodes <- route[(node_nr+2):(length(route))]
@@ -94,8 +95,10 @@ for (node_nr in 1:(length(route)-2)){
   if (max(SDR, na.rm = TRUE) > SDR_expected){
     # Connect to the remainder of original path
     new_all_short_path <- dist2(id_next, New_point, g = g)
-    route <- route[-(match(id_next, route)+2)]
-    for (node in (new_all_short_path[2:length(new_all_short_path)])) {
+    new_all_short_path <- new_all_short_path[2:(length(new_all_short_path))]
+    route <- route[-(match(id_next, route)+1)]
+    route <- append(route, new_all_short_path, after = match(id_next, route))
+    for (node in (new_all_short_path)) {
       s_total <- s_total + map[node,]$score
       map[node,]$score <- 0
     }
