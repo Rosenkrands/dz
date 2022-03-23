@@ -3,9 +3,8 @@ library(dz)
 
 ### Realization of nearby score values
 # Using the variance (and score) columns
-clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500; variances = generate_variances(inst = clust$instance)
-map <- clust$instance$points %>%
-  dplyr::left_join(variances, by = c("id"))
+clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
+map <- clust$instance$points
 # These are only applied/updated when we are within some distance determined at each node according to Kaspers distance to rectangle function
 
 # Compute edges in delaunay triangulation
@@ -43,16 +42,18 @@ route_length <- function(route) {
 }
 
 ### Function for route score
-route_score <- function(route, id_next) {
-  score_temp_realized <- vector(length = match(id_next, route))
-  score_temp_expected <- vector(length = (length(route) - (match(id_next, route))))
+# Use placement of id_next instead of the node id
+route_score <- function(route, id_next_placement) {
+  # route <- unique(route)
+  score_temp_realized <- vector(length = id_next_placement)
+  score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
   for (placement in (1):(length(score_temp_realized)-1)) {
     score_temp_realized[placement] <- map$score_variance[placement]
   }
   for (placement in (1):(length(score_temp_expected)-1)) {
     score_temp_expected[placement] <- map$score[placement]
   }
-  return(sum(score_temp_realized, na.rm = T)+sum(score_temp_expected, na.rm = T))
+  return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
 }
 
 
@@ -111,7 +112,7 @@ for (node_nr in 1:(length(route)-2)){
     d[i] <- route_length(route = route_temp)
     # Realized score
     # s[i] <- (map$score_variance)[candidates[i]]
-    s[i] <- route_score(route = route_temp, id_next = id_next)
+    s[i] <- route_score(route = route_temp, id_next_placement = node_nr + 1)
     # Updated SDR
     SDR[candidates[i]] <- s[i]/d[i]
   }
