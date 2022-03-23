@@ -142,10 +142,7 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
   )
 
   # function to plot progress of routing
-  plot_progress <- function(routes = initial_routes_list,
-                            route,
-                            id_now,
-                            id_next) {
+  plot_progress <- function() {
     route_segments <- tibble::tibble(agent_id = 1:clust$k) |>
       dplyr::mutate(routes = routes) |>
       tidyr::unnest(routes) |>
@@ -158,12 +155,38 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
       dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
                         by = c("id_end" = "id"), suffix = c("","end"))
 
+    # route segments for the updated routes
+    routes[[zone_id]] <- route
+
+    updated_route_segments <- tibble::tibble(agent_id = 1:clust$k) |>
+      dplyr::mutate(routes = routes) |>
+      tidyr::unnest(routes) |>
+      dplyr::group_by(agent_id) |>
+      dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
+      dplyr::filter(!is.na(id_start)) |>
+      dplyr::select(-routes) |>
+      dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
+                        by = c("id_start" = "id")) |>
+      dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
+                        by = c("id_end" = "id"), suffix = c("","end"))
+
+
     # Plot the segment on the existing plot
     ggplot2::ggplot() +
       ggplot2::geom_segment(
         data = clust$same_zone_edges,
         ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
         color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+      ) +
+      ggplot2::geom_point(
+        data = clust$instance$points |> dplyr::filter(id == id_next),
+        ggplot2::aes(x, y), color = "green",
+        shape = 21, size = 6, stroke = 2
+      ) +
+      ggplot2::geom_point(
+        data = clust$instance$points |> dplyr::filter(id %in% candidates),
+        ggplot2::aes(x, y, size = SDR[candidates]), color = "blue",
+        shape = 21, stroke = 1
       ) +
       # Plot points and dots
       # ggplot2::geom_point(
@@ -173,7 +196,12 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
       # Plot points as ids
       ggplot2::geom_text(
         data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
-        ggplot2::aes(x, y, color= as.character(zone), label = id)
+        ggplot2::aes(x, y, label = id)
+      ) +
+      ggplot2::geom_segment(
+        data = updated_route_segments,
+        ggplot2::aes(x=x, y=y, xend=xend, yend=yend),
+        linetype = "solid", color = "blue"
       ) +
       ggplot2::geom_segment(
         data = route_segments,
@@ -189,16 +217,17 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
       ggplot2::guides(
         shape = "none",
         fill = "none",
-        color = "none"
+        color = "none",
+        size = "none",
       )
   }
 
   update_routing <- function(r = 100, zone_id = 1) {
-    # r = 100; zone_id = 1
+    # r = 10; zone_id = 1
     sub_g <- igraph::induced_subgraph(g, vids = clust$cl$zones[[zone_id]])
 
     # plotting
-    plot_progress(updated_routes = NULL)
+    # plot_progress()
 
     # map to stick with current notation
     map <- clust$instance$points
@@ -206,18 +235,18 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
 
     route <- initial_routes_list[[zone_id]]
 
-    # 1. Calculate distance from current line segment to other nodes
     for (node_nr in 1:(length(route)-2)){
       # Get nodes with edges to this node
       id_now <- route[node_nr]
       id_next <- route[node_nr+1]
+      print(id_next)
       map$score_variance[id_next] <- 0
       current_line <- edges |> dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
       remaining_nodes <- route[(node_nr+2):(length(route))]
       l <- 0
       dist_to_edge <- vector()
       candidates <- integer(0)
-      for (node in remaining_nodes) {
+      for (node in unique(clust$cl$zones[[zone_id]])) {
         #Get their coordinates
         l <- l+1
         if (node %in% edges$ind1){
@@ -264,8 +293,10 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
       if (max(SDR, na.rm = TRUE) > SDR_expected){
         # Connect to the remainder of original path
         new_all_short_path <- dist2(id_next, New_point, g = g)
-        route <- route[-(match(id_next, route)+2)]
-        for (node in (new_all_short_path[2:length(new_all_short_path)])) {
+        new_all_short_path <- new_all_short_path[2:(length(new_all_short_path))]
+        route <- route[-(match(id_next, route)+1)]
+        route <- append(route, new_all_short_path, after = match(id_next, route))
+        for (node in (new_all_short_path)) {
           s_total <- s_total + map[node,]$score
           map[node,]$score <- 0
         }
