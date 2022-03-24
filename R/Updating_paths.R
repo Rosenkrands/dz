@@ -82,7 +82,7 @@ for (node_nr in 1:(length(route)-2)){
   dist_to_edge <- vector()
   candidates <- integer(0)
   for (node in nodes_in_zone) {
-    #Get their coordinates
+    #Get their coordinates (nodes_in_zone)
     l <- l+1
     if (node %in% edges$ind1){
       point <- unique(edges %>% filter(ind1 == node) %>% select(x1, y1))
@@ -143,9 +143,11 @@ for (node_nr in 1:(length(route)-2)){
 
 
 
-
-
-
+ro$clustering$plot_data$zones[[1]][[1]] <- solve_routing(L = 500)$route
+routes <- ro$clustering$plot_data$zones[[1]]
+routes[[2]] <- 1
+route <- routes[[1]]
+plot_progress()
 
 
 

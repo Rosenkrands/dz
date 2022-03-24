@@ -9,7 +9,7 @@
 #' @return A list
 #' @export
 #'
-routing <- function(clust, obj = "SDR", L = 500, variances) {
+routing <- function(clust, obj = "SDR", L = 300, variances) {
   # For testing purposes:
   # clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500; variances = generate_variances(inst = clust$instance)
 
@@ -40,7 +40,7 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
   }
 
   # Create route given points
-  solve_routing <- function(obj = obj, L = 100, zone_id = 1){
+  solve_routing <- function(obj = obj, L = L, zone_id = 1){
     # obj = obj; L = 100; zone_id = 1
     map = clust$instance$points |>
       dplyr::filter((id == 1) | (zone == zone_id))
@@ -133,7 +133,7 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
   # calculate the routes
   initial_routes <- lapply(
     routing_results$agent_id,
-    function(zone_id) {solve_routing(obj = "SDR", L = 100, zone_id = zone_id)}
+    function(zone_id) {solve_routing(obj = "SDR", L = L, zone_id = zone_id)}
   )
 
   initial_routes_list <- lapply(
@@ -222,7 +222,31 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
       )
   }
 
-  update_routing <- function(r = 100, zone_id = 1) {
+  ### Function for route length
+  route_length <- function(route) {
+    distance_temp <- vector(length = length(route)-1)
+    for (placement in (1):(length(route)-1)) {
+      distance_temp[placement] <- dist(route[placement], route[placement + 1], g = g)
+    }
+    return(sum(distance_temp))
+  }
+
+  ### Function for route score
+  # Use placement of id_next instead of the node id
+  route_score <- function(route, id_next_placement) {
+    # route <- unique(route)
+    score_temp_realized <- vector(length = id_next_placement)
+    score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
+    for (placement in (1):(length(score_temp_realized)-1)) {
+      score_temp_realized[placement] <- map$score_variance[placement]
+    }
+    for (placement in (1):(length(score_temp_expected)-1)) {
+      score_temp_expected[placement] <- map$score[placement]
+    }
+    return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
+  }
+
+  update_routing <- function(r = 10, zone_id = 1) {
     # r = 10; zone_id = 1
     sub_g <- igraph::induced_subgraph(g, vids = clust$cl$zones[[zone_id]])
 
@@ -272,10 +296,12 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
         route_temp <- route
         route_temp <- append(route_temp, candidates[i], after = match(id_next, route))
         route_temp <- route_temp[-(match(id_next, route_temp)+2)]
-        d[i] <- dist(route[length(route)], candidates[i], g = g) +
-          dist(candidates[i], id_next, g = g)
+        # d[i] <- dist(route[length(route)], candidates[i], g = g) +
+        #   dist(candidates[i], id_next, g = g)
+        d[i] <- route_length(route = route_temp)
         # Realized score
-        s[i] <- (map$score_variance)[candidates[i]]
+        # s[i] <- (map$score_variance)[candidates[i]]
+        s[i] <- route_score(route = route_temp, id_next_placement = node_nr + 1)
         # Updated SDR
         SDR[candidates[i]] <- s[i]/d[i]
       }
@@ -302,8 +328,13 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
         }
       }
     }
+    return(route)
   }
 
+  updated_routes <- lapply(
+    routing_results$agent_id,
+    function(zone_id) {update_routing(zone_id = zone_id)}
+  )
 
   # update routes based on realized values from the uncertainty
   map <- clust$instance$points %>%
@@ -313,7 +344,7 @@ routing <- function(clust, obj = "SDR", L = 500, variances) {
 
   # then we gather results from the k routes into one data structure
 
-  routing_results$routes <- route_list
+  routing_results$routes <- updated_routes
   routing_results$L <- do.call(c, lapply(rslt, function(arg) {arg$L}))
   routing_results$s_total <- do.call(c, lapply(rslt, function(arg) {arg$s_total}))
 
