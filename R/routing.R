@@ -222,48 +222,49 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       )
   }
 
-  ### Function for route length
-  route_length <- function(route) {
-    distance_temp <- vector(length = length(route)-1)
-    for (placement in (1):(length(route)-1)) {
-      distance_temp[placement] <- dist(route[placement], route[placement + 1], g = g)
-    }
-    return(sum(distance_temp))
-  }
-
-  ### Function for route score
-  # Use placement of id_next instead of the node id
-  route_score <- function(route, id_next_placement) {
-    # route <- unique(route)
-    score_temp_realized <- vector(length = id_next_placement)
-    score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
-    for (placement in (1):(length(score_temp_realized)-1)) {
-      score_temp_realized[placement] <- map$score_variance[placement]
-    }
-    for (placement in (1):(length(score_temp_expected)-1)) {
-      score_temp_expected[placement] <- map$score[placement]
-    }
-    return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
-  }
 
   update_routing <- function(r = 10, zone_id = 1) {
     # r = 10; zone_id = 1
     sub_g <- igraph::induced_subgraph(g, vids = clust$cl$zones[[zone_id]])
 
-    # plotting
-    # plot_progress()
+    ### Function for route length
+    route_length <- function(route) {
+      distance_temp <- vector(length = length(route)-1)
+      for (placement in (1):(length(route)-1)) {
+        distance_temp[placement] <- dist(route[placement], route[placement + 1], g = g)
+      }
+      return(sum(distance_temp))
+    }
+
+    ### Function for route score
+    # Use placement of id_next instead of the node id
+    route_score <- function(route, id_next_placement) {
+      # route <- unique(route)
+      score_temp_realized <- vector(length = id_next_placement)
+      score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
+      for (placement in (1):(length(score_temp_realized)-1)) {
+        score_temp_realized[placement] <- map$score_variance[placement]
+      }
+      for (placement in (1):(length(score_temp_expected)-1)) {
+        score_temp_expected[placement] <- map$score[placement]
+      }
+      return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
+    }
 
     # map to stick with current notation
-    map <- clust$instance$points
+    map <- clust$instance$points |>
+      dplyr::rowwise() |>
+      dplyr::mutate(realized_score = ifelse(is.na(score_variance), NA, rnorm(1, mean = score, sd = sqrt(score_variance))))
     edges <- clust$same_zone_edges |> dplyr::filter(zone == zone_id)
 
     route <- initial_routes_list[[zone_id]]
-
+    cat("Starting the route updating loop...\n")
     for (node_nr in 1:(length(route)-2)){
       # Get nodes with edges to this node
-      id_now <- route[node_nr]
-      id_next <- route[node_nr+1]
-      print(id_next)
+      id_now <- route[node_nr]; cat("id_now is", id_now)
+      id_next <- route[node_nr+1]; cat("\tid_next is", id_next, "\n")
+      # cat("id_next is:", id_next, "\n"); if (id_next == 27) stop()
+      cat(route, "\n")
       map$score_variance[id_next] <- 0
       current_line <- edges |> dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
       remaining_nodes <- route[(node_nr+2):(length(route))]
@@ -271,17 +272,19 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       dist_to_edge <- vector()
       candidates <- integer(0)
       for (node in unique(clust$cl$zones[[zone_id]])) {
-        #Get their coordinates
-        l <- l+1
-        if (node %in% edges$ind1){
-          point <- unique(edges |> dplyr::filter(ind1 == node) |> dplyr::select(x1, y1))
-        } else {
-          point <- unique(edges |> dplyr::filter(ind2 == node) |> dplyr::select(x1 = x2, y1 = y2))
-        }
-        dist_to_edge[l] <- distancePointSegment(px = point$x1, py <- point$y1, x1 = current_line$x1, x2 = current_line$x2, y1 = current_line$y1, y2 = current_line$y2)
-        if (dist_to_edge[l] < r){
-          # Nodes on path within viewing distance
-          candidates <- append(candidates, node)
+        if (node != id_next) {
+          #Get their coordinates
+          l <- l+1
+          if (node %in% edges$ind1){
+            point <- unique(edges |> dplyr::filter(ind1 == node) |> dplyr::select(x1, y1))
+          } else {
+            point <- unique(edges |> dplyr::filter(ind2 == node) |> dplyr::select(x1 = x2, y1 = y2))
+          }
+          dist_to_edge[l] <- distancePointSegment(px = point$x1, py <- point$y1, x1 = current_line$x1, x2 = current_line$x2, y1 = current_line$y1, y2 = current_line$y2)
+          if (dist_to_edge[l] < r){
+            # Nodes on path within viewing distance
+            candidates <- append(candidates, node)
+          }
         }
       }
       # Use the candidates to evaluate different routes, loop for all possible:
@@ -316,12 +319,16 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       d_expected <- sum(d_temp, na.rm = T)
       s_expected <- sum(s_temp, na.rm = T)
       SDR_expected <- s_expected/d_expected
+      # if (id_next == 14) {stop()}
       if (max(SDR, na.rm = TRUE) > SDR_expected){
         # Connect to the remainder of original path
         new_all_short_path <- dist2(id_next, New_point, g = g)
+        if (new_all_short_path == 0) {next}
         new_all_short_path <- new_all_short_path[2:(length(new_all_short_path))]
         route <- route[-(match(id_next, route)+1)]
-        route <- append(route, new_all_short_path, after = match(id_next, route))
+        after <- match(id_next, route)
+        route <- append(route, new_all_short_path, after = after)
+        if (route[after + 1] == route[after + 2]) route <- route[-(after + 1)]
         for (node in (new_all_short_path)) {
           s_total <- s_total + map[node,]$score
           map[node,]$score <- 0
