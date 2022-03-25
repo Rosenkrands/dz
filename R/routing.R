@@ -11,7 +11,7 @@
 #'
 routing <- function(clust, obj = "SDR", L = 300, variances) {
   # For testing purposes:
-  # clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500; variances = generate_variances(inst = clust$instance)
+  # clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 300; variances = generate_variances(inst = clust$instance)
 
   clust$instance$points <- clust$instance$points |>
     dplyr::mutate(information = sample(c(0,1), nrow(clust$instance$points), replace = T))
@@ -226,7 +226,7 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
   }
 
   update_routing <- function(r = 10, zone_id = 1) {
-    # r = 10; zone_id = 1
+    # r = 10; zone_id = 3
     sub_g <- igraph::induced_subgraph(g, vids = clust$cl$zones[[zone_id]])
 
     ### Function for route length
@@ -260,14 +260,19 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
     edges <- clust$same_zone_edges |> dplyr::filter(zone == zone_id)
 
     route <- initial_routes_list[[zone_id]]
+
+    # The inital point is fixed so we update the realized score to 0
+    # s_total <- s_total + map[route[2],]$realized_score
+    # map[route[2],]$realized_score <- 0
+
     cat("Starting the route updating loop...\n")
     node_nr = 0
     while (!is.na(route[node_nr+2])) {
-      node_nr <- node_nr +1
+      node_nr <- node_nr +1; cat("node_nr is", node_nr)#; if(node_nr == 20) stop()
     # }
     # for (node_nr in 1:(length(route)-2)){
       # Get nodes with edges to this node
-      id_now <- route[node_nr]; cat("id_now is", id_now)
+      id_now <- route[node_nr]; cat("\tid_now is", id_now)
       id_next <- route[node_nr+1]; cat("\tid_next is", id_next, "\n")
       #if (is.na(id_next)) {break}
       # cat("id_next is:", id_next, "\n"); if (id_next == 27) stop()
@@ -304,7 +309,7 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       SDR <- vector(length = length(map$id))
       for (i in 1:length(candidates)) {
         route_temp <- route
-        route_temp <- append(route_temp, candidates[i], after = match(id_next, route))
+        route_temp <- append(route_temp, candidates[i], after = node_nr + 1)
         route_temp <- route_temp[-(match(id_next, route_temp)+2)]
         # d[i] <- dist(route[length(route)], candidates[i], g = g) +
         #   dist(candidates[i], id_next, g = g)
@@ -319,7 +324,7 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       # Chose best new route if it is better than original
       d_temp <- vector()
       s_temp <- vector()
-      for (i in (match(id_next, route)):((length(route))-1)){
+      for (i in (node_nr + 1):((length(route))-1)){
         d_temp[i] <- dist(route[i], route[i+1], g = g)
         s_temp[i] <- (map$score)[route[i+1]]
       }
@@ -332,14 +337,29 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
         new_all_short_path <- dist2(id_next, New_point, g = g)
         if (new_all_short_path == 0) {next}
         new_all_short_path <- new_all_short_path[2:(length(new_all_short_path))]
-        route <- route[-(match(id_next, route)+1)]
-        after <- match(id_next, route)
+        # route <- route[-(match(id_next, route)+1)]
+        route <- route[-(node_nr + 2)]
+        after <- node_nr + 1 #match(id_next, route)
         route <- append(route, new_all_short_path, after = after)
         if (route[after + 1] == route[after + 2]) route <- route[-(after + 1)]
         for (node in (new_all_short_path)) {
-          s_total <- s_total + map[node,]$score
-          map[node,]$score <- 0
+          s_total <- s_total + map[node,]$realized_score
+          map[node,]$realized_score <- 0
         }
+        if (route[(node_nr + 1) + length(new_all_short_path) + 1] == 1) {
+          new_point_to_source <- dist2(
+            route[(node_nr + 1) + length(new_all_short_path)],
+            1,
+            g = g
+          )
+          new_point_to_source <- new_point_to_source[2:(length(new_point_to_source)-1)]
+          route <- append(route, new_point_to_source, after = (node_nr + 1) + length(new_all_short_path))
+          for (node in (new_point_to_source)) {
+            s_total <- s_total + map[node,]$realized_score
+            map[node,]$realized_score <- 0
+          }
+        }
+        route
       }
     }
     return(route)
