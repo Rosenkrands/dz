@@ -243,7 +243,7 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       score_temp_realized <- vector(length = id_next_placement)
       score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
       for (placement in (1):(length(score_temp_realized)-1)) {
-        score_temp_realized[placement] <- map$score_variance[placement]
+        score_temp_realized[placement] <- map$realized_score[placement]
       }
       for (placement in (1):(length(score_temp_expected)-1)) {
         score_temp_expected[placement] <- map$score[placement]
@@ -259,13 +259,18 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
 
     route <- initial_routes_list[[zone_id]]
     cat("Starting the route updating loop...\n")
-    for (node_nr in 1:(length(route)-2)){
+    node_nr = 0
+    while (!is.na(route[node_nr+2])) {
+      node_nr <- node_nr +1
+    # }
+    # for (node_nr in 1:(length(route)-2)){
       # Get nodes with edges to this node
       id_now <- route[node_nr]; cat("id_now is", id_now)
       id_next <- route[node_nr+1]; cat("\tid_next is", id_next, "\n")
+      #if (is.na(id_next)) {break}
       # cat("id_next is:", id_next, "\n"); if (id_next == 27) stop()
       cat(route, "\n")
-      map$score_variance[id_next] <- 0
+      map$realized_score[id_next] <- 0
       current_line <- edges |> dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
       remaining_nodes <- route[(node_nr+2):(length(route))]
       l <- 0
