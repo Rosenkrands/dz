@@ -3,41 +3,27 @@
 #' Given an instance, number of clusters and a clustering method the function assigns each node of the problem instance a zone.
 #'
 #' @param inst An object returned from the `instance` function
-#' @param variances
 #' @param k The number of clusters
+#' @param variances
+#' @param info
 #' @param cluster_method The method with which to perform the clustering
-#' @param alpha weight between mean distance/total profit and total variance/total profit
+#' @param alpha weight between mean distance/total profit and relevancy
 #'
 #' @return A list ...
 #' @export
 #'
-clustering <- function(inst, k, variances, information, cluster_method = c("greedy", "local_search"), alpha = 1) {
+clustering <- function(inst, k, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
   # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 1
 
   inst$points <- inst$points |>
-    dplyr::left_join(variances, by = c("id")) |> # Join variances on points tibble
-    dplyr::filter(dplyr::row_number() != nrow(inst$points)) # Remove the last point (node 1 will be source and sink)
+    dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
 
   # Save only the intermediate points for clustering
   in_points <- inst$points |> dplyr::filter(point_type == "intermediate")
 
-  # Compute edges in delaunay triangulation
-  tri <- (deldir::deldir(inst$points$x, inst$points$y))$delsgs
-
-  # construct the igraph object
-  tri$dist <- sqrt((tri$x1 - tri$x2)^2 + (tri$y1 - tri$y2)^2)
-
-  g <- igraph::graph.data.frame(
-    tri |> dplyr::select(ind1, ind2, weight = dist),
-    directed = FALSE,
-    vertices = inst$points |> dplyr::select(id, score)
-  )
-
-  # calculate distance matrix
-  dst <- igraph::distances(g)
-
-  info <- generate_information(inst, dst, r = 20)
+  g <- inst$g
+  dst <- inst$dst
 
   greedy_clustering <- function() {
     # add the source node to each zone
@@ -46,7 +32,6 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
       zones[[i]] <- c(1)
     }
 
-    # THE FOLLOWING COULD ALSO BE DONE IN CPP IF WORTH THE TIME
     # keep track of unassigned points
     unassigned <- in_points
     while(nrow(unassigned) > 0) {
@@ -64,20 +49,19 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
             igraph::neighborhood(g, order = 1, nodes = points_in_zone),
             as.vector
           )
-        ) |> unique()
+        ) |> unique() # gather the neighborhood for each point in the zone, concatenate and find the distinct nodes
 
-        nghbr <- nghbr[nghbr %in% unassigned$id]
+        nghbr <- nghbr[nghbr %in% unassigned$id] # restrict neighborhood to unly unassigned nodes
 
         # if there are no neighbors go to next iteration
         if (length(nghbr) < 1) next
 
         # Lookup distances in the distance matrix, while removing loops (rows are neighbors, columns are points in zone)
         dst_temp <- dst[nghbr, points_in_zone] |> as.matrix()
-        if (length(nghbr) == 1) dst_temp <- t(dst_temp) # If there is only one neighbor and multiple points in zone, rows and columns are switched
+        if (length(nghbr) == 1) dst_temp <- t(dst_temp) # If there is only one neighbor and multiple points in zone, rows and columns are switched so we transpose to keep rows as neighbors and columns as points in zone
 
         # return the first minimum distance and add to zone
-
-        # first minimum distance (first column in neighbors, second columns is points in zone)
+        # first minimum distance (first column in neighbors, second column is points in zone)
         closest_point <- nghbr[arrayInd(which.min(dst_temp), dim(dst_temp))[,1]]
         # print(paste0("closest point is ", closest_point))
         if(is.na(closest_point)) stop("closest point is NA")
@@ -93,19 +77,14 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
     }
     cat("unassigned points: 0\nall done!\n")
 
-    # add the sink node to each zone
-    for (i in 1:k) {
-      zones[[i]] <- append(zones[[i]], 1)
-    }
-
     return(
       list(
         "inst_points" = inst$points |>
           dplyr::left_join(
             tibble::tibble(zone = 1:k, id = zones) |>
               tidyr::unnest(cols = id) |>
-              dplyr::filter(id != 1, id != inst$n),
-            by = c("id" = "id")
+              dplyr::filter(id != 1),
+            by = c("id")
           ),
         "zones" = zones
       )
@@ -120,25 +99,31 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
     inst$points <- gclust$inst_points
     zones <- gclust$zones
 
-    # wrapper for the cluster eval function to restrict to a single argument
-    cluster_eval <- function(zone) {
+    avg_dist_profit <- function(zone) {
       dst_temp <- dst[zone, zone] # subset the distance matrix (of shortest paths) to only nodes in the zone
       avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)]) # dst_temp is symmetric so we only need the lower triange (or equivalently upper) not including the diagonal (of all zeroes corresponding to all loop edges)
       total_profit <- sum(inst$points$score[zone]) # get the total profit from the instance table
       total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
 
-      # For testing
-      # x <- seq(-4,4,.01)*sqrt(total_variance) + total_profit
-      # prob <- pnorm(x, mean = total_profit, sd = sqrt(total_variance))
-      #
-      # plot(x, prob, type = "l")
-
       p <- .05
       q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
 
-      # abline(h = p, lty = 2); abline(v = q, lty = 2)
+      return(avg_dist/total_profit)
+    }
 
-      alpha*(avg_dist/total_profit) + (1-alpha)*(avg_dist/q)
+    relevancy <- function(zone) {
+      # find the absolute correlation between points in the zone
+      other_zone <- inst$points$id[-zone]
+
+      abs_info_same_zone <- sum(abs(info[zone, zone]))
+      abs_info_other_zone <- sum(abs(info[zone,other_zone]))
+
+      return(-abs_info_same_zone)
+    }
+
+    # wrapper for the cluster eval function to restrict to a single argument
+    cluster_eval <- function(zone) {
+      alpha*(avg_dist_profit(zone)) + (1-alpha)*(relevancy(zone))
     }
 
     # Operators for the local search (for now there is only insertion)
@@ -156,7 +141,7 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
         )
 
       # A candidate should be understood as moving the respective id to the respective zone
-      candidates <- tri |>
+      candidates <- inst$edges |>
         dplyr::select(ind1, ind2) |>
         dplyr::filter(
           ind1 != 1, ind2 != 1, ind1 != nrow(inst$points), ind2 != nrow(inst$points)
@@ -314,7 +299,7 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
           dplyr::left_join(
             tibble::tibble(zone = 1:k, id = zones) |>
               tidyr::unnest(cols = id) |>
-              dplyr::filter(id != 1, id != inst$n),
+              dplyr::filter(id != 1),
             by = c("id" = "id")
           ),
         "zones" = zones,
@@ -332,7 +317,7 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
 
   inst$points <- cl$inst_points
 
-  same_zone_edges <- tri |>
+  same_zone_edges <- inst$edges |>
     dplyr::left_join(
       inst$points |> dplyr::select(id, zone),
       by = c("ind1" = "id")
@@ -353,7 +338,6 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
       "cluster_method" = cluster_method,
       "cl" = cl,
       "g" = g,
-      "edges" = tri,
       "same_zone_edges" = same_zone_edges,
       "plot_data" = cl$plot_data
     ),
@@ -468,8 +452,7 @@ animate_local_search <- function(clust, filename = "animation.gif") {
 
     # If either delaunay or voronoi is true we compute the triangulation
     if (delaunay) {
-      tri <- deldir::deldir(clust$instance$points$x, clust$instance$points$y)
-      delsgs_same_zone <- tri$delsgs |>
+      delsgs_same_zone <- inst$edges |>
         dplyr::left_join(
           plot_points |> dplyr::select(id, zone),
           by = c("ind1" = "id")

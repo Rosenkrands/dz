@@ -8,7 +8,7 @@ clustering(
   inst,
   k,
   variances,
-  information,
+  info,
   cluster_method = c("greedy", "local_search"),
   alpha = 1
 )
@@ -20,7 +20,7 @@ clustering(
 
 \item{cluster_method}{The method with which to perform the clustering}
 
-\item{alpha}{weight between mean distance/total profit and total variance/total profit}
+\item{alpha}{weight between mean distance/total profit and relevancy}
 }
 \value{
 A list ...

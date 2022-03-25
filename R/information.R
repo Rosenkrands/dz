@@ -3,13 +3,12 @@
 #' Given an instance the function will generate a an information matrix.
 #'
 #' @param inst A list returned from the `instance` function
-#' @param dst Shortest path distances from igraph
 #' @param r The maximum radius information can travel
 #'
 #' @return a matrix of information
 #' @export
 #'
-generate_information <- function(inst, dst, r = 20) {
+generate_information <- function(inst, r = 20) {
   # For testing purposes:
   # inst <- test_instances$p7_chao; r = 20
 
@@ -19,9 +18,9 @@ generate_information <- function(inst, dst, r = 20) {
     nrow = nrow(inst$points)
   )
 
-  info <- (eps / dst)
+  info <- (eps / inst$dst)
   info[!is.finite(info)] <- 0
-  info[dst > r] <- 0
+  info[inst$dst > r] <- 0
 
   return(info)
 }
