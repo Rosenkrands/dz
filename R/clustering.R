@@ -11,7 +11,7 @@
 #' @return A list ...
 #' @export
 #'
-clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_search"), alpha = 1) {
+clustering <- function(inst, k, variances, information, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
   # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 1
 
@@ -36,6 +36,8 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
 
   # calculate distance matrix
   dst <- igraph::distances(g)
+
+  info <- generate_information(inst, dst, r = 20)
 
   greedy_clustering <- function() {
     # add the source node to each zone
@@ -347,6 +349,7 @@ clustering <- function(inst, variances, k, cluster_method = c("greedy", "local_s
     list(
       "instance" = inst,
       "k" = k,
+      "info" = info,
       "cluster_method" = cluster_method,
       "cl" = cl,
       "g" = g,

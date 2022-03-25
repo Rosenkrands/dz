@@ -6,8 +6,9 @@
 \usage{
 clustering(
   inst,
-  variances,
   k,
+  variances,
+  information,
   cluster_method = c("greedy", "local_search"),
   alpha = 1
 )
