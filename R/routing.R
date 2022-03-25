@@ -226,7 +226,7 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
   }
 
   update_routing <- function(r = 10, zone_id = 1) {
-    # r = 10; zone_id = 3
+    # r = 10; zone_id = 1
     sub_g <- igraph::induced_subgraph(g, vids = clust$cl$zones[[zone_id]])
 
     ### Function for route length
@@ -283,7 +283,8 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       l <- 0
       dist_to_edge <- vector()
       candidates <- integer(0)
-      for (node in unique(clust$cl$zones[[zone_id]])) {
+      potential_candidates <- unique(clust$cl$zones[[zone_id]])
+      for (node in potential_candidates) {
         if (node != id_next) {
           #Get their coordinates
           l <- l+1
@@ -307,23 +308,27 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       d <- vector(length = length(map$id))
       s <- vector(length = length(map$id))
       SDR <- vector(length = length(map$id))
-      for (i in 1:length(candidates)) {
+      for (i in 1:(length(candidates))) {
         route_temp <- route[1:(node_nr+1)]
         # route_temp <- append(route_temp, candidates[i], after = node_nr + 1)
         # Node from id_next to candidate
         temp_short_path <- dist2(id_next, candidates[i], g = g)
         route_temp <- append(route_temp, temp_short_path[2:(length(temp_short_path))], after = node_nr + 1)
         # Nodes from candidate to remainder of original route
-        temp_short_path2 <- dist2(candidates[i], route[node_nr+3], g = g)
-        route_temp <- append(route_temp, temp_short_path2[2:(length(temp_short_path2))], after = length(route_temp))
+        if (candidates[i] != route[node_nr+3]) {
+          temp_short_path2 <- dist2(candidates[i], route[node_nr+3], g = g)
+          route_temp <- append(route_temp, temp_short_path2[2:(length(temp_short_path2))], after = length(route_temp))
+        }
+        # if (temp_short_path2 == 0) {}
         temp_short_path3 <- route[(node_nr+4):(length(route))]
         route_temp <- append(route_temp, temp_short_path3, after = length(route_temp))
         # route_temp <- route_temp[-(match(id_next, route_temp)+2)]
         # d[i] <- dist(route[length(route)], candidates[i], g = g) +
         #   dist(candidates[i], id_next, g = g)
-        # d[i] <- route_length(route = route_temp)
-        d[i] <- dist(id_next, candidates[i], g = g) +
-          dist(candidates[i], route_temp[node_nr+3], g = g)
+        d[i] <- route_length(route = route_temp)
+        # Distance from last visited to candidate + candidate to first in remaining route not yet visited
+        # d[i] <- dist(id_next, candidates[i], g = g) +
+          # dist(candidates[i], temp_short_path2[length(temp_short_path2)], g = g)
         # Realized score
         # s[i] <- (map$score_variance)[candidates[i]]
         s[i] <- route_score(route = route_temp, id_next_placement = node_nr + 1)
