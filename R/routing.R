@@ -308,12 +308,22 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
       s <- vector(length = length(map$id))
       SDR <- vector(length = length(map$id))
       for (i in 1:length(candidates)) {
-        route_temp <- route
-        route_temp <- append(route_temp, candidates[i], after = node_nr + 1)
-        route_temp <- route_temp[-(match(id_next, route_temp)+2)]
+        route_temp <- route[1:(node_nr+1)]
+        # route_temp <- append(route_temp, candidates[i], after = node_nr + 1)
+        # Node from id_next to candidate
+        temp_short_path <- dist2(id_next, candidates[i], g = g)
+        route_temp <- append(route_temp, temp_short_path[2:(length(temp_short_path))], after = node_nr + 1)
+        # Nodes from candidate to remainder of original route
+        temp_short_path2 <- dist2(candidates[i], route[node_nr+3], g = g)
+        route_temp <- append(route_temp, temp_short_path2[2:(length(temp_short_path2))], after = length(route_temp))
+        temp_short_path3 <- route[(node_nr+4):(length(route))]
+        route_temp <- append(route_temp, temp_short_path3, after = length(route_temp))
+        # route_temp <- route_temp[-(match(id_next, route_temp)+2)]
         # d[i] <- dist(route[length(route)], candidates[i], g = g) +
         #   dist(candidates[i], id_next, g = g)
-        d[i] <- route_length(route = route_temp)
+        # d[i] <- route_length(route = route_temp)
+        d[i] <- dist(id_next, candidates[i], g = g) +
+          dist(candidates[i], route_temp[node_nr+3], g = g)
         # Realized score
         # s[i] <- (map$score_variance)[candidates[i]]
         s[i] <- route_score(route = route_temp, id_next_placement = node_nr + 1)
