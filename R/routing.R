@@ -13,6 +13,9 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
   # For testing purposes:
   # clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500; variances = generate_variances(inst = clust$instance)
 
+  clust$instance$points <- clust$instance$points |>
+    dplyr::mutate(information = sample(c(0,1), nrow(clust$instance$points), replace = T))
+
   # reuse igraph created during clustering
   g <- clust$g
 
@@ -221,7 +224,6 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
         size = "none",
       )
   }
-
 
   update_routing <- function(r = 10, zone_id = 1) {
     # r = 10; zone_id = 1

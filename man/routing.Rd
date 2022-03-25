@@ -4,7 +4,7 @@
 \alias{routing}
 \title{Generate routes for a clustered instance}
 \usage{
-routing(clust, obj = "SDR", L = 500, variances)
+routing(clust, obj = "SDR", L = 300, variances)
 }
 \arguments{
 \item{clust}{A list returned from the `clustering` function}
