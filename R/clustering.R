@@ -16,7 +16,7 @@
 #'
 clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; k = 4; L = 100; eps = 60; cluster_method = "greedy"; variances = generate_variances(inst); alpha = 1
+  # inst = test_instances$p7_chao; k = 4; L = 40; eps = 0; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 1; info <- generate_information(inst, r = 20)
 
   inst$points <- inst$points |>
     dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
@@ -90,7 +90,8 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
               tidyr::unnest(cols = id) |>
               dplyr::filter(id != 1),
             by = c("id")
-          ),
+          ) |>
+          dplyr::mutate(zone = ifelse(id == 1, 0, zone)),
         "zones" = zones
       )
     )
@@ -101,14 +102,20 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
     gclust <- greedy_clustering()
 
     # storing the points and zones
-    inst$points <- gclust$inst_points
+    # inst$points <- gclust$inst_points
+    in_points <- in_points |>
+      dplyr::left_join(
+        gclust$inst_points |>
+          dplyr::select(id, zone),
+        by = c("id")
+      )
     zones <- gclust$zones
 
     avg_dist_profit <- function(zone) {
       dst_temp <- dst[zone, zone] # subset the distance matrix (of shortest paths) to only nodes in the zone
       avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)]) # dst_temp is symmetric so we only need the lower triange (or equivalently upper) not including the diagonal (of all zeroes corresponding to all loop edges)
-      total_profit <- sum(inst$points$score[zone]) # get the total profit from the instance table
-      total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
+      total_profit <- sum(in_points$score[zone], na.rm = T) # get the total profit from the instance table
+      total_variance <- sum(in_points$score_variance[zone], na.rm = T)
 
       p <- .05
       q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
@@ -118,7 +125,7 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
 
     relevancy <- function(zone) {
       # find the absolute correlation between points in the zone
-      other_zone <- inst$points$id[-zone]
+      other_zone <- in_points$id[-zone]
 
       abs_info_same_zone <- sum(abs(info[zone, zone]))
       abs_info_other_zone <- sum(abs(info[zone,other_zone]))
@@ -136,7 +143,7 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
     insertion <- function(zones, bks_obj) {
 
       # Update zones for generating the candidates
-      inst_temp <- inst$points |>
+      inst_temp <- in_points |>
         dplyr::select(id) |>
         dplyr::left_join(
           tibble::tibble(zone = 1:k, id = zones) |>
@@ -149,7 +156,7 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
       candidates <- inst$edges |>
         dplyr::select(ind1, ind2) |>
         dplyr::filter(
-          ind1 != 1, ind2 != 1, ind1 != nrow(inst$points), ind2 != nrow(inst$points)
+          ind1 != 1, ind2 != 1
         ) |>
         dplyr::inner_join(inst_temp, by = c("ind1" = "id")) |>
         dplyr::inner_join(inst_temp, by = c("ind2" = "id")) |>
@@ -306,7 +313,8 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
               tidyr::unnest(cols = id) |>
               dplyr::filter(id != 1),
             by = c("id" = "id")
-          ),
+          ) |>
+          dplyr::mutate(zone = ifelse(id == 1, 0, zone)),
         "zones" = zones,
         "obj" = obj,
         "plot_data" = list("obj" = ls_obj, "zones" = zones_list, "iter_max" = iter_max)
@@ -322,21 +330,17 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
 
   inst$points <- cl$inst_points
 
-  # TODO: Remove edges that are either between NA zones or where one end is NA
-  points_temp <- inst$points |>
-    dplyr::select(id, zone) |>
-    dplyr::mutate(zone = ifelse(id == 1, 0, zone))
+  points_temp <-
 
   same_zone_edges <- inst$edges |>
     dplyr::left_join(
-      points_temp,
+      inst$points |> dplyr::select(id, zone),
       by = c("ind1" = "id")
     ) |>
     dplyr::left_join(
-      points_temp,
+      inst$points |> dplyr::select(id, zone),
       by = c("ind2" = "id")
     ) |>
-    # dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
     dplyr::filter((zone.x == zone.y) | (zone.x == 0) | (zone.y == 0)) |>
     dplyr::mutate(zone = ifelse(zone.x == 0, zone.y, zone.x)) |>
     dplyr::select(-c(zone.x,zone.y))
