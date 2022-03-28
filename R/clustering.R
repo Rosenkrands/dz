@@ -4,6 +4,8 @@
 #'
 #' @param inst An object returned from the `instance` function
 #' @param k The number of clusters
+#' @param L The length constraint for each agent
+#' @param eps A sensitivity parameter for the preprocessing of the instance with regards to excluding points that are too far away.
 #' @param variances
 #' @param info
 #' @param cluster_method The method with which to perform the clustering
@@ -12,18 +14,21 @@
 #' @return A list ...
 #' @export
 #'
-clustering <- function(inst, k, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
+clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 1
+  # inst = test_instances$p7_chao; k = 4; L = 100; eps = 60; cluster_method = "greedy"; variances = generate_variances(inst); alpha = 1
 
   inst$points <- inst$points |>
     dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
 
-  # Save only the intermediate points for clustering
-  in_points <- inst$points |> dplyr::filter(point_type == "intermediate")
-
   g <- inst$g
   dst <- inst$dst
+
+  # Preprocessing the instance based on the length constraint
+  inst$points$in_range <- dst[1,] < L-eps
+
+  # Save only the intermediate points that are in range for clustering
+  in_points <- inst$points |> dplyr::filter(point_type == "intermediate", in_range)
 
   greedy_clustering <- function() {
     # add the source node to each zone
@@ -317,17 +322,23 @@ clustering <- function(inst, k, variances, info, cluster_method = c("greedy", "l
 
   inst$points <- cl$inst_points
 
+  # TODO: Remove edges that are either between NA zones or where one end is NA
+  points_temp <- inst$points |>
+    dplyr::select(id, zone) |>
+    dplyr::mutate(zone = ifelse(id == 1, 0, zone))
+
   same_zone_edges <- inst$edges |>
     dplyr::left_join(
-      inst$points |> dplyr::select(id, zone),
+      points_temp,
       by = c("ind1" = "id")
     ) |>
     dplyr::left_join(
-      inst$points |> dplyr::select(id, zone),
+      points_temp,
       by = c("ind2" = "id")
     ) |>
-    dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
-    dplyr::mutate(zone = ifelse(is.na(zone.x), zone.y, zone.x)) |>
+    # dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
+    dplyr::filter((zone.x == zone.y) | (zone.x == 0) | (zone.y == 0)) |>
+    dplyr::mutate(zone = ifelse(zone.x == 0, zone.y, zone.x)) |>
     dplyr::select(-c(zone.x,zone.y))
 
   structure(
