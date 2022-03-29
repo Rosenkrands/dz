@@ -261,11 +261,11 @@ while(length(remaining_nodes) != 0){
     remaining_route <- remaining_route[remaining_route != (remaining_nodes[2])]
     remaining_route <- append(remaining_route, sp, after = 2)
     longer_than_original <- longer_than_original + (length(remaining_route) - length(last_remaining_route))
-    if (is.na(remaining_route[3])) {route <- append(route, 1); break}
+    if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
     route <- append(route, remaining_route[3:(length(sp)+2)])
     remaining_route <- remaining_route[-(1:(length(sp)))]
   } else {
-    if (is.na(remaining_route[3])) {route <- append(route, 1); break}
+    if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
     route <- append(route, remaining_route[3])
     # Update remaining_route by removing the ones already visited (excluding id_now and id_next for the next iteration)
     remaining_route <- remaining_route[remaining_route != remaining_route[1]]
