@@ -230,6 +230,7 @@ while(length(remaining_nodes) != 0){
   SDR_cand <- vector(length = length(map$id))
   # Calculate SDR for each new route segment resulting from using a candidate in the route
   for (candidate in candidates[candidates != id_next]){
+    print(candidate)
     # From current to candidate
     d_cand_1[candidate] <- dist(id_next, candidate, g = g)
     sp_cand_1[[candidate]] <- dist2(id_next, candidate, g = g)
@@ -241,7 +242,11 @@ while(length(remaining_nodes) != 0){
     d_cand_2[candidate] <- dist(candidate, remaining_nodes[2], g = g)
     sp_cand_2[[candidate]] <- dist2(candidate, remaining_nodes[2], g = g)
     for (sp_node in sp_cand_2[[candidate]]) {
-      s_cand_tot[candidate] <- s_cand_tot[candidate] + map$realized_score[sp_node]
+      # handle the case of candidate being equal to remaining_nodes[2]
+      realized_score <- map$realized_score[sp_node]
+      if (length(realized_score) == 0) {realized_score <- map$realized_score[candidate]}
+
+      s_cand_tot[candidate] <- s_cand_tot[candidate] + realized_score
     }
     # Summarized
     d_cand_tot[candidate] <- d_cand_1[candidate] + d_cand_2[candidate]
@@ -273,10 +278,6 @@ while(length(remaining_nodes) != 0){
   # Update remaining_nodes
   remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]
 }
-
-
-
-
 
 # ro$clustering$plot_data$zones[[1]][[1]] <- solve_routing(L = 500)$route
 # routes <- ro$clustering$plot_data$zones[[1]]
