@@ -1,6 +1,33 @@
 library(tidyverse)
 library(dz)
 set.seed(10)
+
+zone_id = 1
+
+# Function for calculating the distance of the shortest (DL) path between 2 points.
+dist <- function(id1, id2, g){
+  # Find vertices that make up the path
+  if (id1 == id2) return(0)
+  short_vert <- as.vector(igraph::shortest_paths(graph = g, from = id1, to = id2, output = "vpath")$vpath[[1]])
+  # Calculate total distance between them
+  route_length <- 0
+  dist_matrix <- igraph::distances(g)
+  for (node in 1:(length(short_vert)-1)){
+    temp <- dist_matrix[short_vert[node], short_vert[node+1]]
+    route_length <- route_length + temp
+  }
+  return(route_length)
+}
+
+# Dist function that returns only the points in the path
+dist2 <- function(id1, id2, g){
+  # Find vertices that make up the path
+  if (id1 == id2) return(0)
+  short_vert <- as.vector(igraph::shortest_paths(graph = g, from = id1, to = id2, output = "vpath")$vpath[[1]])
+  return(short_vert)
+}
+
+
 ### Realization of nearby score values
 # Using the variance (and score) columns
 clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
