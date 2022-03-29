@@ -4,12 +4,10 @@
 \alias{generate_information}
 \title{Generate an information set}
 \usage{
-generate_information(inst, dst, r = 20)
+generate_information(inst, r = 20)
 }
 \arguments{
 \item{inst}{A list returned from the `instance` function}
-
-\item{dst}{Shortest path distances from igraph}
 
 \item{r}{The maximum radius information can travel}
 }

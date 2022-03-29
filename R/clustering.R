@@ -3,41 +3,32 @@
 #' Given an instance, number of clusters and a clustering method the function assigns each node of the problem instance a zone.
 #'
 #' @param inst An object returned from the `instance` function
-#' @param variances
 #' @param k The number of clusters
+#' @param L The length constraint for each agent
+#' @param eps A sensitivity parameter for the preprocessing of the instance with regards to excluding points that are too far away.
+#' @param variances
+#' @param info
 #' @param cluster_method The method with which to perform the clustering
-#' @param alpha weight between mean distance/total profit and total variance/total profit
+#' @param alpha weight between mean distance/total profit and relevancy
 #'
 #' @return A list ...
 #' @export
 #'
-clustering <- function(inst, k, variances, information, cluster_method = c("greedy", "local_search"), alpha = 1) {
+clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; k = 4; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 1
+  # inst = test_instances$p7_chao; k = 5; L = 40; eps = 0; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 0; info <- generate_information(inst, r = 100)
 
   inst$points <- inst$points |>
-    dplyr::left_join(variances, by = c("id")) |> # Join variances on points tibble
-    dplyr::filter(dplyr::row_number() != nrow(inst$points)) # Remove the last point (node 1 will be source and sink)
+    dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
 
-  # Save only the intermediate points for clustering
-  in_points <- inst$points |> dplyr::filter(point_type == "intermediate")
+  g <- inst$g
+  dst <- inst$dst
 
-  # Compute edges in delaunay triangulation
-  tri <- (deldir::deldir(inst$points$x, inst$points$y))$delsgs
+  # Preprocessing the instance based on the length constraint
+  inst$points$in_range <- dst[1,] < L-eps
 
-  # construct the igraph object
-  tri$dist <- sqrt((tri$x1 - tri$x2)^2 + (tri$y1 - tri$y2)^2)
-
-  g <- igraph::graph.data.frame(
-    tri |> dplyr::select(ind1, ind2, weight = dist),
-    directed = FALSE,
-    vertices = inst$points |> dplyr::select(id, score)
-  )
-
-  # calculate distance matrix
-  dst <- igraph::distances(g)
-
-  info <- generate_information(inst, dst, r = 20)
+  # Save only the intermediate points that are in range for clustering
+  in_points <- inst$points |> dplyr::filter(point_type == "intermediate", in_range)
 
   greedy_clustering <- function() {
     # add the source node to each zone
@@ -46,13 +37,12 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
       zones[[i]] <- c(1)
     }
 
-    # THE FOLLOWING COULD ALSO BE DONE IN CPP IF WORTH THE TIME
     # keep track of unassigned points
     unassigned <- in_points
     while(nrow(unassigned) > 0) {
       for (i in 1:k) {
-        cat("unassigned points:", nrow(unassigned), "\r")
-        # cat("zone: ", i, "\n")
+        message("unassigned points: ", nrow(unassigned))
+        # message("zone: ", i, "\n")
         # assign nearest point to each zone
         points_in_zone <- zones[[i]]
 
@@ -64,20 +54,19 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
             igraph::neighborhood(g, order = 1, nodes = points_in_zone),
             as.vector
           )
-        ) |> unique()
+        ) |> unique() # gather the neighborhood for each point in the zone, concatenate and find the distinct nodes
 
-        nghbr <- nghbr[nghbr %in% unassigned$id]
+        nghbr <- nghbr[nghbr %in% unassigned$id] # restrict neighborhood to unly unassigned nodes
 
         # if there are no neighbors go to next iteration
         if (length(nghbr) < 1) next
 
         # Lookup distances in the distance matrix, while removing loops (rows are neighbors, columns are points in zone)
         dst_temp <- dst[nghbr, points_in_zone] |> as.matrix()
-        if (length(nghbr) == 1) dst_temp <- t(dst_temp) # If there is only one neighbor and multiple points in zone, rows and columns are switched
+        if (length(nghbr) == 1) dst_temp <- t(dst_temp) # If there is only one neighbor and multiple points in zone, rows and columns are switched so we transpose to keep rows as neighbors and columns as points in zone
 
         # return the first minimum distance and add to zone
-
-        # first minimum distance (first column in neighbors, second columns is points in zone)
+        # first minimum distance (first column in neighbors, second column is points in zone)
         closest_point <- nghbr[arrayInd(which.min(dst_temp), dim(dst_temp))[,1]]
         # print(paste0("closest point is ", closest_point))
         if(is.na(closest_point)) stop("closest point is NA")
@@ -91,12 +80,7 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
         unassigned <- unassigned |> dplyr::filter(id != closest_point)
       }
     }
-    cat("unassigned points: 0\nall done!\n")
-
-    # add the sink node to each zone
-    for (i in 1:k) {
-      zones[[i]] <- append(zones[[i]], 1)
-    }
+    # message("unassigned points: 0\nall done!\n")
 
     return(
       list(
@@ -104,9 +88,10 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
           dplyr::left_join(
             tibble::tibble(zone = 1:k, id = zones) |>
               tidyr::unnest(cols = id) |>
-              dplyr::filter(id != 1, id != inst$n),
-            by = c("id" = "id")
-          ),
+              dplyr::filter(id != 1),
+            by = c("id")
+          ) |>
+          dplyr::mutate(zone = ifelse(id == 1, 0, zone)),
         "zones" = zones
       )
     )
@@ -117,28 +102,52 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
     gclust <- greedy_clustering()
 
     # storing the points and zones
-    inst$points <- gclust$inst_points
+    # inst$points <- gclust$inst_points
+    in_points <- in_points |>
+      dplyr::left_join(
+        gclust$inst_points |>
+          dplyr::select(id, zone),
+        by = c("id")
+      )
     zones <- gclust$zones
 
-    # wrapper for the cluster eval function to restrict to a single argument
-    cluster_eval <- function(zone) {
+    avg_dist_profit <- function(zone) {
       dst_temp <- dst[zone, zone] # subset the distance matrix (of shortest paths) to only nodes in the zone
       avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)]) # dst_temp is symmetric so we only need the lower triange (or equivalently upper) not including the diagonal (of all zeroes corresponding to all loop edges)
-      total_profit <- sum(inst$points$score[zone]) # get the total profit from the instance table
+      if (is.na(avg_dist)) avg_dist <- Inf
+      total_profit <- sum(inst$points$score[zone], na.rm = T) # get the total profit from the instance table
       total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
-
-      # For testing
-      # x <- seq(-4,4,.01)*sqrt(total_variance) + total_profit
-      # prob <- pnorm(x, mean = total_profit, sd = sqrt(total_variance))
-      #
-      # plot(x, prob, type = "l")
 
       p <- .05
       q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
 
-      # abline(h = p, lty = 2); abline(v = q, lty = 2)
+      return(avg_dist/total_profit)
+    }
 
-      alpha*(avg_dist/total_profit) + (1-alpha)*(avg_dist/q)
+    relevancy <- function(zone) {
+      # find the absolute correlation between points in the zone
+      # other_zone <- in_points$id[-zone]
+      other_zone <- intersect(
+        inst$points$id[-zone], # All points ids that are not the zone
+        in_points$id # Point ids that are in range
+      )
+
+      abs_info_same_zone <- sum(abs(info[zone, zone]))
+      abs_info_other_zone <- sum(abs(info[zone,other_zone]))
+
+      return(-abs_info_same_zone)
+    }
+
+    # wrapper for the cluster eval function to restrict to a single argument
+    cluster_eval <- function(zone) {
+      # handle the edge case that we have 0 * Inf
+      profit <- alpha*(avg_dist_profit(zone))
+      info <- (1-alpha)*(relevancy(zone))
+      if (is.na(profit) & alpha == 0) {
+        return(info)
+      }
+      # else return the weigthed sum
+      alpha*(avg_dist_profit(zone)) + (1-alpha)*(relevancy(zone))
     }
 
     # Operators for the local search (for now there is only insertion)
@@ -146,20 +155,20 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
     insertion <- function(zones, bks_obj) {
 
       # Update zones for generating the candidates
-      inst_temp <- inst$points |>
+      inst_temp <- in_points |>
         dplyr::select(id) |>
         dplyr::left_join(
           tibble::tibble(zone = 1:k, id = zones) |>
             tidyr::unnest(cols = id) |>
-            dplyr::filter(id != 1, id != inst$n),
+            dplyr::filter(id != 1),
           by = c("id" = "id")
         )
 
       # A candidate should be understood as moving the respective id to the respective zone
-      candidates <- tri |>
+      candidates <- inst$edges |>
         dplyr::select(ind1, ind2) |>
         dplyr::filter(
-          ind1 != 1, ind2 != 1, ind1 != nrow(inst$points), ind2 != nrow(inst$points)
+          ind1 != 1, ind2 != 1
         ) |>
         dplyr::inner_join(inst_temp, by = c("ind1" = "id")) |>
         dplyr::inner_join(inst_temp, by = c("ind2" = "id")) |>
@@ -169,6 +178,11 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
                       id2 = ifelse(name == "zone.x", ind1, ind2)) |>
         dplyr::select(id = id1, zone_id) |>
         dplyr::distinct()
+
+      if (nrow(candidates) == 0) {
+        warning("There are no candidates, maybe all points are in one zone")
+        return(zones)
+      }
 
       # Check if a zone is connected
       connected <- function(zone) {
@@ -204,9 +218,9 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
 
       best_insert <- NA
       best_insert_obj <- bks_obj
-      # cat("\n")
+      # message("\n")
       for (i in 1:nrow(candidates)) {
-        # cat("candidates left:", nrow(candidates) - i, "\r")
+        # message("candidates left:", nrow(candidates) - i, "\r")
         id <- candidates[i,] |> dplyr::pull(id)
         zone_id <- candidates[i,] |> dplyr::pull(zone_id)
 
@@ -246,7 +260,7 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
     iter_max = 100
 
     initial_obj <- do.call(sum, lapply(zones, cluster_eval))
-    cat("Inital objective is:", initial_obj, "\n")
+    message("Inital objective is: ", round(initial_obj, 5))
 
     # save convergence data in vector
     ls_obj <- numeric(length = iter_max + 1)
@@ -274,16 +288,16 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
         # saving data for the zone animation
         zones_list[[iter + 1]] <- zones
 
-        cat("objective:", bks_obj, "\titeration:", iter, "\r")
+        message("iteration: ", iter, "   objective: ", round(bks_obj, 5))
       } else {
         ls_obj[iter + 1] <- ls_obj[iter]
         zones_list[[iter + 1]] <- zones_list[[iter]]
-        cat("\nlocal search conclude with bks:", bks_obj, "\n")
+        # message("local search conclude with bks: ", round(bks_obj, 5))
         break
       }
 
       if (iter == iter_max) {
-        cat("\nreached maximum number of iterations\n")
+        message("reached maximum number of iterations")
         break
       }
     }
@@ -314,9 +328,10 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
           dplyr::left_join(
             tibble::tibble(zone = 1:k, id = zones) |>
               tidyr::unnest(cols = id) |>
-              dplyr::filter(id != 1, id != inst$n),
+              dplyr::filter(id != 1),
             by = c("id" = "id")
-          ),
+          ) |>
+          dplyr::mutate(zone = ifelse(id == 1, 0, zone)),
         "zones" = zones,
         "obj" = obj,
         "plot_data" = list("obj" = ls_obj, "zones" = zones_list, "iter_max" = iter_max)
@@ -332,7 +347,7 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
 
   inst$points <- cl$inst_points
 
-  same_zone_edges <- tri |>
+  same_zone_edges <- inst$edges |>
     dplyr::left_join(
       inst$points |> dplyr::select(id, zone),
       by = c("ind1" = "id")
@@ -341,8 +356,8 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
       inst$points |> dplyr::select(id, zone),
       by = c("ind2" = "id")
     ) |>
-    dplyr::filter((zone.x == zone.y) | (is.na(zone.x) | is.na(zone.y))) |>
-    dplyr::mutate(zone = ifelse(is.na(zone.x), zone.y, zone.x)) |>
+    dplyr::filter((zone.x == zone.y) | (zone.x == 0) | (zone.y == 0)) |>
+    dplyr::mutate(zone = ifelse(zone.x == 0, zone.y, zone.x)) |>
     dplyr::select(-c(zone.x,zone.y))
 
   structure(
@@ -353,7 +368,6 @@ clustering <- function(inst, k, variances, information, cluster_method = c("gree
       "cluster_method" = cluster_method,
       "cl" = cl,
       "g" = g,
-      "edges" = tri,
       "same_zone_edges" = same_zone_edges,
       "plot_data" = cl$plot_data
     ),
@@ -468,8 +482,7 @@ animate_local_search <- function(clust, filename = "animation.gif") {
 
     # If either delaunay or voronoi is true we compute the triangulation
     if (delaunay) {
-      tri <- deldir::deldir(clust$instance$points$x, clust$instance$points$y)
-      delsgs_same_zone <- tri$delsgs |>
+      delsgs_same_zone <- inst$edges |>
         dplyr::left_join(
           plot_points |> dplyr::select(id, zone),
           by = c("ind1" = "id")
@@ -516,7 +529,7 @@ animate_local_search <- function(clust, filename = "animation.gif") {
   # animation function that prints individual frames
   local_search_animation <- function() {
     for (i in 1:clust$plot_data$iter_max + 1) {
-      cat("iteration", i - 1, "of", clust$plot_data$iter_max, "\r")
+      message("iteration", i - 1, "of", clust$plot_data$iter_max)
       print(
         cowplot::plot_grid(
           plot_iter_convergence(iter = i - 1),
@@ -524,7 +537,6 @@ animate_local_search <- function(clust, filename = "animation.gif") {
         )
       )
     }
-    cat("\n")
   }
 
   # generate the gif

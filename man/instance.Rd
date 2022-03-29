@@ -13,6 +13,9 @@ instance(path_to_file)
 `instance` returns an object of \code{\link{class}} "`instance`".
   An object of class "`instance`" is a list containing:
   `points` a `tibble` containing coordinates and scores for each point.
+  `edges` a `tibble` containing the (weighted) edges in the graph.
+  `g` an igraph object of the graph making up the instance.
+  `dst` a matrix containing the length of shortest paths between points.
   `n` an integer equal to the number of points in the instance.
 }
 \description{

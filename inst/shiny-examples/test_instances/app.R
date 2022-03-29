@@ -12,8 +12,7 @@ ui <- fluidPage(
                         label = "Select instance",
                         choices = names(dz::test_instances),
                         selected = names(dz::test_instances)[1]),
-            checkboxInput(inputId = "delaunay", label = "Delaunay triangulation"),
-            checkboxInput(inputId = "voronoi", label = "Voronoi tesselation")
+            checkboxInput(inputId = "delaunay", label = "Delaunay triangulation")
         ),
 
         mainPanel(
@@ -25,7 +24,7 @@ ui <- fluidPage(
 server <- function(input, output) {
 
     output$instancePlot <- renderPlot({
-        plot(dz::test_instances[[input$instance]], delaunay = input$delaunay, voronoi = input$voronoi)
+        plot(dz::test_instances[[input$instance]], delaunay = input$delaunay)
     }, res = 110, width = 1000, height = 600)
 }
 
