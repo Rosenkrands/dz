@@ -4,6 +4,87 @@ set.seed(10)
 
 zone_id = 1
 
+# function to plot progress of routing
+plot_progress <- function() {
+  route_segments <- tibble::tibble(agent_id = zone_id, routes = original_route) |>
+    # dplyr::mutate(routes = routes) |>
+    # tidyr::unnest(routes) |>
+    # dplyr::group_by(agent_id) |>
+    dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
+    dplyr::filter(!is.na(id_start)) |>
+    dplyr::select(-routes) |>
+    dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
+                      by = c("id_start" = "id")) |>
+    dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
+                      by = c("id_end" = "id"), suffix = c("","end"))
+
+  # route segments for the updated routes
+  # routes[[zone_id]] <- route
+
+  updated_route_segments <- tibble::tibble(agent_id = zone_id, routes = route) |>
+    # dplyr::mutate(routes = routes) |>
+    # tidyr::unnest(routes) |>
+    # dplyr::group_by(agent_id) |>
+    dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
+    dplyr::filter(!is.na(id_start)) |>
+    dplyr::select(-routes) |>
+    dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
+                      by = c("id_start" = "id")) |>
+    dplyr::inner_join(clust$instance$points |> dplyr::select(id, x, y),
+                      by = c("id_end" = "id"), suffix = c("","end"))
+
+
+  # Plot the segment on the existing plot
+  ggplot2::ggplot() +
+    ggplot2::geom_segment(
+      data = clust$same_zone_edges,
+      ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+      color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+    ) +
+    ggplot2::geom_point(
+      data = clust$instance$points |> dplyr::filter(id == id_next),
+      ggplot2::aes(x, y), color = "green",
+      shape = 21, size = 6, stroke = 2
+    ) +
+    # ggplot2::geom_point(
+    #   data = clust$instance$points |> dplyr::filter(id %in% candidates),
+    #   ggplot2::aes(x, y), color = "blue",
+    #   shape = 21, stroke = 1
+    # ) +
+    # Plot points and dots
+    # ggplot2::geom_point(
+    #   data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
+    #   ggplot2::aes(x, y, color= as.character(zone))
+    # ) +
+    # Plot points as ids
+    ggplot2::geom_text(
+      data = clust$instance$points |> dplyr::filter(point_type == "intermediate"),
+      ggplot2::aes(x, y, label = id)
+    ) +
+    ggplot2::geom_segment(
+      data = updated_route_segments,
+      ggplot2::aes(x=x, y=y, xend=xend, yend=yend),
+      linetype = "solid", color = "blue"
+    ) +
+    ggplot2::geom_segment(
+      data = route_segments,
+      ggplot2::aes(x=x, y=y, xend=xend, yend=yend),
+      linetype = "dashed"
+    ) +
+    ggplot2::geom_point(
+      data = clust$instance$points |> dplyr::filter(point_type == "terminal"),
+      ggplot2::aes(x, y), color = "red", shape = 17
+    ) +
+    ggplot2::ggtitle(paste0("Instance: ", clust$instance$name)) +
+    ggplot2::theme_bw() +
+    ggplot2::guides(
+      shape = "none",
+      fill = "none",
+      color = "none",
+      size = "none",
+    )
+}
+
 # Function for calculating the distance of the shortest (DL) path between 2 points.
 dist <- function(id1, id2, g){
   # Find vertices that make up the path
@@ -178,10 +259,14 @@ r <- 100
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1)
+remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1); original_route <- remaining_route
 remaining_nodes <- remaining_route[3:length(remaining_route)]
+# For plotting purposes
+id_now <- remaining_route[1]; id_next <- remaining_route[2]
 route <- remaining_route[1:2]
+print(plot_progress())
 while(length(remaining_nodes) != 0){
+  invisible(readline(prompt="Press [enter] to continue"))
   # Keep track of changes
   last_remaining_route <- remaining_route
   # Node the UAV flew from
@@ -230,7 +315,7 @@ while(length(remaining_nodes) != 0){
   SDR_cand <- vector(length = length(map$id))
   # Calculate SDR for each new route segment resulting from using a candidate in the route
   for (candidate in candidates[candidates != id_next]){
-    print(candidate)
+    # print(candidate)
     # From current to candidate
     d_cand_1[candidate] <- dist(id_next, candidate, g = g)
     sp_cand_1[[candidate]] <- dist2(id_next, candidate, g = g)
@@ -277,15 +362,18 @@ while(length(remaining_nodes) != 0){
   }
   # Update remaining_nodes
   remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]
+
+  # For plotting purposes
+  id_now <- remaining_route[1]; id_next <- remaining_route[2]
+  print(plot_progress())
 }
 
+# For plotting purposes
+readline(prompt="Press [enter] to continue")
+id_next <- 1
+print(plot_progress())
 # ro$clustering$plot_data$zones[[1]][[1]] <- solve_routing(L = 500)$route
 # routes <- ro$clustering$plot_data$zones[[1]]
 # routes[[4]] <- 1
 # routes[[1]] <- route_info$route
 # plot_progress()
-
-
-
-
-
