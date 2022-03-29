@@ -1,6 +1,6 @@
 library(tidyverse)
 library(dz)
-set.seed(10)
+set.seed(100)
 ### Realization of nearby score values
 # Using the variance (and score) columns
 clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
