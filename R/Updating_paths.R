@@ -258,16 +258,9 @@ r <- 100
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-<<<<<<< HEAD
 # remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1)
 remaining_route <- solve_routing(L = 500)$route
 remaining_nodes <- c(remaining_route[3:length(remaining_route)], 1)
-=======
-remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1); original_route <- remaining_route
-remaining_nodes <- remaining_route[3:length(remaining_route)]
-# For plotting purposes
-id_now <- remaining_route[1]; id_next <- remaining_route[2]
->>>>>>> 083fe657d7da204772bf922c93a204909cfc1622
 route <- remaining_route[1:2]
 print(plot_progress())
 while(length(remaining_nodes) != 0){
