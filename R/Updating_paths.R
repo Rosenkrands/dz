@@ -1,6 +1,5 @@
 library(tidyverse)
 library(dz)
-set.seed(10)
 
 zone_id = 1
 
@@ -178,14 +177,16 @@ r <- 100
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1)
-remaining_nodes <- remaining_route[3:length(remaining_route)]
+# remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1)
+remaining_route <- solve_routing(L = 500)$route
+remaining_nodes <- c(remaining_route[3:length(remaining_route)], 1)
 route <- remaining_route[1:2]
 while(length(remaining_nodes) != 0){
   # Keep track of changes
   last_remaining_route <- remaining_route
   # Node the UAV flew from
   id_now <- remaining_route[1]
+  cat("now, next", "\n")
   print(id_now)
   # The node currently occupied by the UAV
   id_next <- remaining_route[2]
@@ -193,7 +194,7 @@ while(length(remaining_nodes) != 0){
   # Since it has been visited the score is updated
   map$realized_score[id_now] <- 0
   map$realized_score[id_next] <- 0
-  map$score[id_next] <- 0
+  # map$score[id_next] <- 0
   # The previous path traveled to get here
   current_line <- edges %>% dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
   # Viewing distance to all nodes in the zones
@@ -230,7 +231,7 @@ while(length(remaining_nodes) != 0){
   SDR_cand <- vector(length = length(map$id))
   # Calculate SDR for each new route segment resulting from using a candidate in the route
   for (candidate in candidates[candidates != id_next]){
-    print(candidate)
+    # print(candidate)
     # From current to candidate
     d_cand_1[candidate] <- dist(id_next, candidate, g = g)
     sp_cand_1[[candidate]] <- dist2(id_next, candidate, g = g)
@@ -253,15 +254,20 @@ while(length(remaining_nodes) != 0){
     SDR_cand[candidate] <- (s_cand_tot[candidate])/(d_cand_tot[candidate])
   }
   New_point <- which.max(SDR_cand)
+  cat("New_point:", "\n")
+  print(New_point)
   # Add and remove these from the route according to (shortest paths) SDR
   # We remove two and add at least two
   longer_than_original <- 0
-  if (max(SDR_cand) > SDR_planned_realized){
+  if ((max(SDR_cand) > SDR_planned_realized) & !(New_point %in% remaining_route)){
     # Remove the node that would originally be visited after id_next
     remaining_route <- remaining_route[remaining_route != remaining_nodes[1]]
     # Add new
     sp <- c(dist2(id_next, New_point, g = g)[2:(length(dist2(id_next, New_point, g = g)))],
             (dist2(New_point, remaining_nodes[2], g = g)[2:((length(dist2(New_point, remaining_nodes[2], g = g))))]))
+    cat("Added sp:", "\n")
+    map$realized_score[sp] <- 0
+    print(sp)
     # Remove the extra start of end of original
     remaining_route <- remaining_route[remaining_route != (remaining_nodes[2])]
     remaining_route <- append(remaining_route, sp, after = 2)
@@ -269,6 +275,9 @@ while(length(remaining_nodes) != 0){
     if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
     route <- append(route, remaining_route[3:(length(sp)+2)])
     remaining_route <- remaining_route[-(1:(length(sp)))]
+    map$realized_score[New_point] <-  0
+    cat("Added a node not in original route", "\n")
+    print(New_point)
   } else {
     if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
     route <- append(route, remaining_route[3])
@@ -276,7 +285,9 @@ while(length(remaining_nodes) != 0){
     remaining_route <- remaining_route[remaining_route != remaining_route[1]]
   }
   # Update remaining_nodes
-  remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]
+  remaining_nodes <- remaining_nodes[remaining_nodes != (remaining_nodes[1])]
+  if (length(remaining_nodes) == 0) {break}
+  if (route[length(route)] == remaining_nodes[1]) {remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]}
 }
 
 # ro$clustering$plot_data$zones[[1]][[1]] <- solve_routing(L = 500)$route
