@@ -1,6 +1,5 @@
 library(tidyverse)
 library(dz)
-set.seed(10)
 
 zone_id = 1
 
@@ -168,109 +167,24 @@ route_score <- function(route, id_next_placement) {
   return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
 }
 
-
-# Use these in the loop below to improve SDR for the path as actual score is discovered
-
-### Changes to the path
-# Evaluation of whether the existing path is worth updating
-r <- 100
-# 1. Calculate distance from current line segment to other nodes
-# for (node_nr in 1:(length(route)-2)){
-#   # Get nodes with edges to this node
-#   id_now <- route[node_nr]
-#   id_next <- route[node_nr+1]
-#   if (id_now == id_next) {
-#     node_nr = node_nr + 1
-#     id_now <- route[node_nr]
-#     id_next <- route[node_nr+1]
-#   }
-#   print(id_next)
-#   map$realized_score[id_next] <- 0
-#   map$score[id_next] <- 0
-#   current_line <- edges %>% dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
-#   #remaining_nodes <- route[(node_nr+2):(length(route))]
-#   nodes_in_zone <- (map %>% filter(zone == 1))$id
-#   l <- 0
-#   dist_to_edge <- vector()
-#   candidates <- integer(0)
-#   for (node in nodes_in_zone) {
-#     #Get their coordinates (nodes_in_zone)
-#     l <- l+1
-#     if (node %in% edges$ind1){
-#       point <- unique(edges %>% filter(ind1 == node) %>% select(x1, y1))
-#     } else {
-#       point <- unique(edges %>% filter(ind2 == node) %>% select(x1 = x2, y1 = y2))
-#     }
-#     dist_to_edge[l] <- distancePointSegment(px = point$x1, py <- point$y1, x1 = current_line$x1, x2 = current_line$x2, y1 = current_line$y1, y2 = current_line$y2)
-#     if (dist_to_edge[l] < r){
-#       # Nodes on path within viewing distance
-#       candidates <- append(candidates, node)
-#     }
-#   }
-#   # Use the candidates to evaluate different routes, loop for all possible:
-#   # 1. Length of new route
-#   # 3. Trade-off
-#   #g <- graph.data.frame(delsgs %>% select(ind1, ind2, weight = dist), directed = FALSE, vertices = all_points %>% select(local_id, score))
-#   s_total <- 0
-#   d <- vector(length = length(map$id))
-#   s <- vector(length = length(map$id))
-#   SDR <- vector(length = length(map$id))
-#   for (i in 1:length(candidates)) {
-#     route_temp <- route
-#     route_temp <- append(route_temp, candidates[i], after = match(id_next, route))
-#     route_temp <- route_temp[-(match(id_next, route_temp)+2)]
-#     # d[i] <- dist(route[length(route)], candidates[i], g = g) +
-#       # dist(candidates[i], id_next, g = g)
-#     d[i] <- route_length(route = route_temp)
-#     # Realized score
-#     # s[i] <- (map$score_variance)[candidates[i]]
-#     s[i] <- route_score(route = route_temp, id_next_placement = node_nr + 1)
-#     # Updated SDR
-#     SDR[candidates[i]] <- s[i]/d[i]
-#   }
-#   SDR[id_next] <- 0
-#   New_point <- which.max(SDR)
-#   # Chose best new route if it is better than original
-#   d_temp <- vector()
-#   s_temp <- vector()
-#   for (i in (match(id_next, route)):((length(route))-1)){
-#     d_temp[i] <- dist(route[i], route[i+1], g = g)
-#     s_temp[i] <- (map$realized_score)[route[i+1]]
-#   }
-#   d_expected <- sum(d_temp, na.rm = T)
-#   s_expected <- sum(s_temp, na.rm = T)
-#   SDR_expected <- s_expected/d_expected
-#   if (max(SDR, na.rm = TRUE) > SDR_expected){
-#     # Connect to the remainder of original path
-#     new_all_short_path <- dist2(id_next, New_point, g = g)
-#     new_all_short_path <- new_all_short_path[2:(length(new_all_short_path))]
-#     route <- route[-(match(id_next, route)+1)]
-#     route <- append(route, new_all_short_path, after = match(id_next, route))
-#     for (node in (new_all_short_path)) {
-#       s_total <- s_total + map[node,]$score
-#       map[node,]$score <- 0
-#     }
-#   }
-# }
-#
-
-
-
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1); original_route <- remaining_route
-remaining_nodes <- remaining_route[3:length(remaining_route)]
-# For plotting purposes
-id_now <- remaining_route[1]; id_next <- remaining_route[2]
+r <- 100
+# remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1)
+initial_route <- solve_routing(L = 500)
+remaining_route <- initial_route$route
+remaining_nodes <- c(remaining_route[3:length(remaining_route)], 1)
 route <- remaining_route[1:2]
 print(plot_progress())
+L_remaining <- initial_route$L
 while(length(remaining_nodes) != 0){
   invisible(readline(prompt="Press [enter] to continue"))
   # Keep track of changes
   last_remaining_route <- remaining_route
   # Node the UAV flew from
   id_now <- remaining_route[1]
+  cat("now, next", "\n")
   print(id_now)
   # The node currently occupied by the UAV
   id_next <- remaining_route[2]
@@ -278,7 +192,7 @@ while(length(remaining_nodes) != 0){
   # Since it has been visited the score is updated
   map$realized_score[id_now] <- 0
   map$realized_score[id_next] <- 0
-  map$score[id_next] <- 0
+  # map$score[id_next] <- 0
   # The previous path traveled to get here
   current_line <- edges %>% dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
   # Viewing distance to all nodes in the zones
@@ -338,15 +252,20 @@ while(length(remaining_nodes) != 0){
     SDR_cand[candidate] <- (s_cand_tot[candidate])/(d_cand_tot[candidate])
   }
   New_point <- which.max(SDR_cand)
+  cat("New_point:", "\n")
+  print(New_point)
   # Add and remove these from the route according to (shortest paths) SDR
   # We remove two and add at least two
   longer_than_original <- 0
-  if (max(SDR_cand) > SDR_planned_realized){
+  if ((max(SDR_cand) > SDR_planned_realized) & !(New_point %in% remaining_route)){
     # Remove the node that would originally be visited after id_next
     remaining_route <- remaining_route[remaining_route != remaining_nodes[1]]
     # Add new
     sp <- c(dist2(id_next, New_point, g = g)[2:(length(dist2(id_next, New_point, g = g)))],
             (dist2(New_point, remaining_nodes[2], g = g)[2:((length(dist2(New_point, remaining_nodes[2], g = g))))]))
+    cat("Added sp:", "\n")
+    map$realized_score[sp] <- 0
+    print(sp)
     # Remove the extra start of end of original
     remaining_route <- remaining_route[remaining_route != (remaining_nodes[2])]
     remaining_route <- append(remaining_route, sp, after = 2)
@@ -354,6 +273,9 @@ while(length(remaining_nodes) != 0){
     if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
     route <- append(route, remaining_route[3:(length(sp)+2)])
     remaining_route <- remaining_route[-(1:(length(sp)))]
+    map$realized_score[New_point] <-  0
+    cat("Added a node not in original route", "\n")
+    print(New_point)
   } else {
     if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
     route <- append(route, remaining_route[3])
@@ -361,19 +283,9 @@ while(length(remaining_nodes) != 0){
     remaining_route <- remaining_route[remaining_route != remaining_route[1]]
   }
   # Update remaining_nodes
-  remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]
-
-  # For plotting purposes
-  id_now <- remaining_route[1]; id_next <- remaining_route[2]
-  print(plot_progress())
+  remaining_nodes <- remaining_nodes[remaining_nodes != (remaining_nodes[1])]
+  if (length(remaining_nodes) == 0) {break}
+  if (route[length(route)] == remaining_nodes[1]) {remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]}
 }
 
-# For plotting purposes
-readline(prompt="Press [enter] to continue")
-id_next <- 1
-print(plot_progress())
-# ro$clustering$plot_data$zones[[1]][[1]] <- solve_routing(L = 500)$route
-# routes <- ro$clustering$plot_data$zones[[1]]
-# routes[[4]] <- 1
-# routes[[1]] <- route_info$route
 # plot_progress()
