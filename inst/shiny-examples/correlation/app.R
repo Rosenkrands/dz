@@ -48,7 +48,7 @@ plot_info <- function(node_id = 1, delaunay = T) {
   p <- p +
     ggplot2::geom_point(
       data = inst$points,# |> dplyr::filter(point_type == "intermediate"),
-      ggplot2::aes(x, y, size = abs(info[node_id,]), shape = point_type, alpha = .3)
+      ggplot2::aes(x, y, size = abs(info[node_id,]), color = sign(info[node_id, ]), shape = point_type, alpha = .3)
     ) +
     ggplot2::geom_point(
       data = inst$points |> dplyr::filter(point_type == "terminal"),
