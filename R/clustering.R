@@ -25,7 +25,7 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
   dst <- inst$dst
 
   # Preprocessing the instance based on the length constraint
-  inst$points$in_range <- dst[1,] < L-eps
+  inst$points$in_range <- dst[1,] < (L/2)-eps
 
   # Save only the intermediate points that are in range for clustering
   in_points <- inst$points |> dplyr::filter(point_type == "intermediate", in_range)
