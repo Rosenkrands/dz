@@ -253,8 +253,6 @@ r <- 100
 # }
 #
 
-
-
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
@@ -368,25 +366,9 @@ while(length(remaining_nodes) != 0){
     remaining_route <- remaining_route[remaining_route != remaining_route[1]]
   }
   # Update remaining_nodes
-<<<<<<< HEAD
   remaining_nodes <- remaining_nodes[remaining_nodes != (remaining_nodes[1])]
   if (length(remaining_nodes) == 0) {break}
   if (route[length(route)] == remaining_nodes[1]) {remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]}
-=======
-  remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]
-
-  # For plotting purposes
-  id_now <- remaining_route[1]; id_next <- remaining_route[2]
-  print(plot_progress())
->>>>>>> 083fe657d7da204772bf922c93a204909cfc1622
 }
 
-# For plotting purposes
-readline(prompt="Press [enter] to continue")
-id_next <- 1
-print(plot_progress())
-# ro$clustering$plot_data$zones[[1]][[1]] <- solve_routing(L = 500)$route
-# routes <- ro$clustering$plot_data$zones[[1]]
-# routes[[4]] <- 1
-# routes[[1]] <- route_info$route
 # plot_progress()
