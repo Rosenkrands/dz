@@ -42,10 +42,10 @@ dist2 <- function(id1, id2, g){
   return(short_vert)
 }
 
-obj = 'SDR'; L = 500
 # Create route given points
-solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
+solve_routing <- function(obj = 'SDR', L = 150, zone_id = 1){
   # obj = 'SDR'; L = 500; zone_id = 2
+  # L_remaining <- L
   map = clust$instance$points |>
     dplyr::filter((id == 1) | (zone == zone_id))
 
@@ -71,7 +71,7 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
   last_in_current <- route[length(route)]
   route <- append(route, 1)
   s_total <- 0
-  while (L > 0) {
+  while (L_remaining > 0) {
     if (obj == 'SDR'){
       d <- vector(length = length(map$id))
       s <- vector(length = length(map$id))
@@ -83,7 +83,7 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
           dist(candidates[i], route[length(route)-1], g = g) -
           as.vector(dist(route[length(route_temp)-2], route_temp[1], g = g))
         s[i] <- map[candidates[i],]$score
-        SDR[i] <- s[candidates[i]]/d[candidates[i]]
+        SDR[i] <- s[i]/d[i]
       }
       New_last <- which.max(SDR)
       all_short_path <- dist2(route[length(route)-1], New_last, g = g)
@@ -102,18 +102,23 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
       map[New_last,]$score <- 0
       print(New_last)
     }
-    if (dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g) < L){
+    if ((dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g)) < L_remaining){
       route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
       # Construct route back to base
       all_short_path_return <- dist2(New_last, 1, g = g)
       # For-loop to remove all new distances, not just the last in new shortest path
-      L <- L + dist(last_in_current, 1, g = g)
-      L <- L - dist(route[length(route)], route[length(route)-1], g = g)
-      if (length(all_short_path > 2)){
-        for (i in 1:(length(all_short_path)-1)){
-          L <- L - dist(all_short_path[length(all_short_path)-i+1], all_short_path[length(all_short_path)-i], g = g)
-        }
+      # L <- L + dist(last_in_current, 1, g = g)
+      # L <- L - dist(route[length(route)], route[length(route)-1], g = g)
+      # if (length(all_short_path > 2)){
+      #   for (i in 1:(length(all_short_path)-1)){
+      #     L <- L - dist(all_short_path[length(all_short_path)-i+1], all_short_path[length(all_short_path)-i], g = g)
+      #   }
+      # }
+      route_global <- vector(length = length(route))
+      for (i in 1:length(route)){
+        route_global[i] <- lookup$id[route[i]]
       }
+      L_remaining <- L - route_length(route = route_global)
       # print(route)
     } else {
       # Add route back to base
@@ -124,7 +129,7 @@ solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
       # Switch last two before terminal
       # route <- replace(route, c(length(route)-1, length(route)-2), route[c(length(route)-2, length(route)-1)])
       # Function to plot path using information in route object
-      output <- list("route" = route, "L" = L, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+      output <- list("route" = route, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
       return(output)
     }
   }
@@ -136,7 +141,7 @@ routing_results <- tibble::tibble(agent_id = 1:clust$k)
 # Caclculate the routes
 rslt <- lapply(
   routing_results$agent_id,
-  function(zone_id) {solve_routing(obj = "SDR", L = 300, zone_id = zone_id)}
+  function(zone_id) {solve_routing(obj = "SDR", L = 500, zone_id = zone_id)}
 )
 
 # then we gather results from the k routes into one data structure
