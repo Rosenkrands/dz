@@ -42,10 +42,41 @@ dist2 <- function(id1, id2, g){
   return(short_vert)
 }
 
+g <- igraph::graph.data.frame(
+  tri |> dplyr::select(ind1, ind2, weight = dist),
+  directed = FALSE,
+  vertices = clust$instance$points |> dplyr::select(id, score)
+)
+
+### Function for route length
+route_length <- function(route) {
+  distance_temp <- vector(length = length(route)-1)
+  for (placement in (1):(length(route)-1)) {
+    distance_temp[placement] <- dist(route[placement], route[placement + 1], g = g)
+  }
+  return(sum(distance_temp))
+}
+
+### Function for route score
+# Use placement of id_next instead of the node id
+route_score <- function(route, id_next_placement) {
+  # route <- unique(route)
+  score_temp_realized <- vector(length = id_next_placement)
+  score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
+  for (placement in (1):(length(score_temp_realized)-1)) {
+    score_temp_realized[placement] <- map$score_variance[placement]
+  }
+  for (placement in (1):(length(score_temp_expected)-1)) {
+    score_temp_expected[placement] <- map$score[placement]
+  }
+  return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
+}
+
+
 # Create route given points
 solve_routing <- function(obj = 'SDR', L = 150, zone_id = 1){
   # obj = 'SDR'; L = 500; zone_id = 2
-  # L_remaining <- L
+  L_remaining <- L
   map = clust$instance$points |>
     dplyr::filter((id == 1) | (zone == zone_id))
 
