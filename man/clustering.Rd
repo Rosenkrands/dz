@@ -7,6 +7,8 @@
 clustering(
   inst,
   k,
+  L,
+  eps,
   variances,
   info,
   cluster_method = c("greedy", "local_search"),
@@ -17,6 +19,10 @@ clustering(
 \item{inst}{An object returned from the `instance` function}
 
 \item{k}{The number of clusters}
+
+\item{L}{The length constraint for each agent}
+
+\item{eps}{A sensitivity parameter for the preprocessing of the instance with regards to excluding points that are too far away.}
 
 \item{cluster_method}{The method with which to perform the clustering}
 
