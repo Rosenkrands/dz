@@ -174,7 +174,8 @@ route_score <- function(route, id_next_placement) {
 
 # r <- 100
 # remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1)
-initial_route <- solve_routing(L = 200)
+L <- 160
+initial_route <- solve_routing(L = L)
 remaining_route <- initial_route$route
 remaining_nodes <- c(remaining_route[3:length(remaining_route)], 1)
 route <- remaining_route[1:2]
@@ -194,29 +195,6 @@ while(length(remaining_nodes) != 0){
   # Since it has been visited the score is updated
   map$realized_score[id_now] <- 0
   map$realized_score[id_next] <- 0
-  # map$score[id_next] <- 0
-  # The previous path traveled to get here
-  current_line <- edges %>% dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
-  # Viewing distance to all nodes in the zone
-  # l <- 0
-  # dist_to_edge <- vector()
-  # candidates <- integer(0)
-  # for (node in nodes_in_zone) {
-  #   #Get their coordinates (nodes_in_zone)
-  #   l <- l+1
-  #   if (node %in% edges$ind1){
-  #     point <- unique(edges %>% filter(ind1 == node) %>% select(x1, y1))
-  #   } else {
-  #     point <- unique(edges %>% filter(ind2 == node) %>% select(x1 = x2, y1 = y2))
-  #   }
-  #   dist_to_edge[l] <- distancePointSegment(px = point$x1, py <- point$y1, x1 = current_line$x1, x2 = current_line$x2, y1 = current_line$y1, y2 = current_line$y2)
-  #   # Add the nodes in the zone, that are within viewing distance
-  #   if (dist_to_edge[l] < r){
-  #     # Nodes in zone within viewing distance
-  #     candidates <- append(candidates, node)
-  #   }
-  # }
-  # Use all in zone instead of radius
   candidates <- nodes_in_zone
   # Update realized score depending on other visited nodes
   for (node_i in route) {
@@ -271,16 +249,17 @@ while(length(remaining_nodes) != 0){
   cat("New_point:", "\n")
   print(New_point)
   # Add and remove these from the route according to (shortest paths) SDR
-  # We remove two and add at least two
+  # We remove two and add at least two, so we need to track route
   longer_than_original <- 0
   # Check length constraint
+  L_remaining <- L - route_length(route = route)
   L_required <- dist(id_next, New_point, g = g) + dist(New_point, remaining_nodes[2], g = g)
   while (L_remaining < L_required) {
     SDR_cand[New_point] <- 0
     New_point <- which.max(SDR_cand)
     L_required <- dist(id_next, New_point, g = g) + dist(New_point, remaining_nodes[2], g = g)
   }
-  if ((max(SDR_cand) > SDR_planned_realized) & !(New_point %in% remaining_route) ){ # & (L_remaining > L_required)
+  if ((max(SDR_cand) > SDR_planned_realized) & !(New_point %in% remaining_route) & (L_remaining > L_required) ){
     # Remove the node that would originally be visited after id_next
     remaining_route <- remaining_route[remaining_route != remaining_nodes[1]]
     # Add new
@@ -300,12 +279,6 @@ while(length(remaining_nodes) != 0){
     cat("Added a node not in original route", "\n")
     print(New_point)
   } else {
-    # if (L_remaining < L_required){
-    #   d2_home <- dist2(id_next, 1, g = g)
-    #   route <- append(route, d2_home[2:(length(d2_home)-1)])
-    #   route <- append(route, 1)
-    #   break
-    # }
     if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
     route <- append(route, remaining_route[3])
     # Update remaining_route by removing the ones already visited (excluding id_now and id_next for the next iteration)
@@ -315,7 +288,6 @@ while(length(remaining_nodes) != 0){
   remaining_nodes <- remaining_nodes[remaining_nodes != (remaining_nodes[1])]
   if (length(remaining_nodes) == 0) {break}
   if (route[length(route)] == remaining_nodes[1]) {remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]}
-  L_remaining <- L - route_length(route = route)
 }
 
 plot_progress()

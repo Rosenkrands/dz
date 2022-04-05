@@ -42,10 +42,41 @@ dist2 <- function(id1, id2, g){
   return(short_vert)
 }
 
+g <- igraph::graph.data.frame(
+  tri |> dplyr::select(ind1, ind2, weight = dist),
+  directed = FALSE,
+  vertices = clust$instance$points |> dplyr::select(id, score)
+)
+
+### Function for route length
+route_length <- function(route) {
+  distance_temp <- vector(length = length(route)-1)
+  for (placement in (1):(length(route)-1)) {
+    distance_temp[placement] <- dist(route[placement], route[placement + 1], g = g)
+  }
+  return(sum(distance_temp))
+}
+
+### Function for route score
+# Use placement of id_next instead of the node id
+route_score <- function(route, id_next_placement) {
+  # route <- unique(route)
+  score_temp_realized <- vector(length = id_next_placement)
+  score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
+  for (placement in (1):(length(score_temp_realized)-1)) {
+    score_temp_realized[placement] <- map$score_variance[placement]
+  }
+  for (placement in (1):(length(score_temp_expected)-1)) {
+    score_temp_expected[placement] <- map$score[placement]
+  }
+  return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
+}
+
+
 # Create route given points
 solve_routing <- function(obj = 'SDR', L = 150, zone_id = 1){
-  # obj = 'SDR'; L = 500; zone_id = 2
-  # L_remaining <- L
+  # obj = 'SDR'; L = 150; zone_id = 1
+  L_remaining <- L
   map = clust$instance$points |>
     dplyr::filter((id == 1) | (zone == zone_id))
 
@@ -72,6 +103,7 @@ solve_routing <- function(obj = 'SDR', L = 150, zone_id = 1){
   route <- append(route, 1)
   s_total <- 0
   while (L_remaining > 0) {
+    print(lookup$id[route])
     if (obj == 'SDR'){
       d <- vector(length = length(map$id))
       s <- vector(length = length(map$id))
@@ -84,12 +116,10 @@ solve_routing <- function(obj = 'SDR', L = 150, zone_id = 1){
           as.vector(dist(route[length(route_temp)-2], route_temp[1], g = g))
         s[i] <- map[candidates[i],]$score
         SDR[i] <- s[i]/d[i]
+        SDR[1] <- 0
       }
       New_last <- which.max(SDR)
       all_short_path <- dist2(route[length(route)-1], New_last, g = g)
-      # print(all_short_path[2:length(all_short_path)])
-      #print(route)
-      # candidates <- candidates[!candidates %in% all_short_path]
       for (node in (all_short_path[2:length(all_short_path)])) {
         s_total <- s_total + map[node,]$score
         map[node,]$score <- 0
@@ -102,36 +132,28 @@ solve_routing <- function(obj = 'SDR', L = 150, zone_id = 1){
       map[New_last,]$score <- 0
       print(New_last)
     }
-    if ((dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g)) < L_remaining){
-      route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
-      # Construct route back to base
-      all_short_path_return <- dist2(New_last, 1, g = g)
-      # For-loop to remove all new distances, not just the last in new shortest path
-      # L <- L + dist(last_in_current, 1, g = g)
-      # L <- L - dist(route[length(route)], route[length(route)-1], g = g)
-      # if (length(all_short_path > 2)){
-      #   for (i in 1:(length(all_short_path)-1)){
-      #     L <- L - dist(all_short_path[length(all_short_path)-i+1], all_short_path[length(all_short_path)-i], g = g)
-      #   }
-      # }
-      route_global <- vector(length = length(route))
-      for (i in 1:length(route)){
-        route_global[i] <- lookup$id[route[i]]
+    while ((dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g)) > L_remaining){
+      SDR[New_last] <- 0
+      New_last <- which.max(SDR)
+      if (SDR[New_last] == 0) {
+        # Add route back to base
+        all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
+        route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
+        for (i in 1:length(route)){
+          route_global[i] <- lookup$id[route[i]]
+        }
+        L_remaining <- L - route_length(route = route_global)
+        # Function to plot path using information in route object
+        output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+        return(output)
       }
-      L_remaining <- L - route_length(route = route_global)
-      # print(route)
-    } else {
-      # Add route back to base
-      route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
-      for (i in 1:length(route)){
-        route[i] <- lookup$id[route[i]]
-      }
-      # Switch last two before terminal
-      # route <- replace(route, c(length(route)-1, length(route)-2), route[c(length(route)-2, length(route)-1)])
-      # Function to plot path using information in route object
-      output <- list("route" = route, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
-      return(output)
     }
+    route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
+    route_global <- vector(length = length(route))
+    for (i in 1:length(route)){
+      route_global[i] <- lookup$id[route[i]]
+    }
+    L_remaining <- L - route_length(route = route_global)
   }
 }
 
