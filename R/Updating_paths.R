@@ -110,11 +110,13 @@ dist2 <- function(id1, id2, g){
 
 ### Realization of nearby score values
 # Using the variance (and score) columns
-clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
+clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 200
 map <- clust$instance$points |>
   dplyr::rowwise() |>
-  dplyr::mutate(realized_score = ifelse(is.na(score_variance), NA, rnorm(1, mean = score, sd = sqrt(score_variance))))
+  dplyr::mutate(realized_score = ifelse(is.na(score_variance), NA, rnorm(1, mean = score, sd = sqrt(score_variance)))) |>
+  dplyr::mutate(unexpected = (realized_score > (score+1.96*sqrt(score_variance))) | (realized_score < (score-1.96*sqrt(score_variance))))
 map$realized_score[1] <- 0
+map$unexpected[1] <- FALSE
 edges <- clust$same_zone_edges |> dplyr::filter(zone == zone_id)
 # These are only applied/updated when we are within some distance determined at each node according to Kaspers distance to rectangle function
 
@@ -170,13 +172,14 @@ route_score <- function(route, id_next_placement) {
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-r <- 100
+# r <- 100
 # remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1)
 initial_route <- solve_routing(L = 200)
 remaining_route <- initial_route$route
 remaining_nodes <- c(remaining_route[3:length(remaining_route)], 1)
 route <- remaining_route[1:2]
 print(plot_progress())
+nodes_in_zone <- (map %>% filter(zone == 1))$id
 L_remaining <- initial_route$L_remaining
 while(length(remaining_nodes) != 0){
   # Keep track of changes
@@ -194,24 +197,38 @@ while(length(remaining_nodes) != 0){
   # map$score[id_next] <- 0
   # The previous path traveled to get here
   current_line <- edges %>% dplyr::filter(ind1 == id_now | ind1 == id_next, ind2 == id_now | ind2 == id_next)
-  # Viewing distance to all nodes in the zones
-  nodes_in_zone <- (map %>% filter(zone == 1))$id
-  l <- 0
-  dist_to_edge <- vector()
-  candidates <- integer(0)
-  for (node in nodes_in_zone) {
-    #Get their coordinates (nodes_in_zone)
-    l <- l+1
-    if (node %in% edges$ind1){
-      point <- unique(edges %>% filter(ind1 == node) %>% select(x1, y1))
-    } else {
-      point <- unique(edges %>% filter(ind2 == node) %>% select(x1 = x2, y1 = y2))
-    }
-    dist_to_edge[l] <- distancePointSegment(px = point$x1, py <- point$y1, x1 = current_line$x1, x2 = current_line$x2, y1 = current_line$y1, y2 = current_line$y2)
-    # Add the nodes in the zone, that are within viewing distance
-    if (dist_to_edge[l] < r){
-      # Nodes in zone within viewing distance
-      candidates <- append(candidates, node)
+  # Viewing distance to all nodes in the zone
+  # l <- 0
+  # dist_to_edge <- vector()
+  # candidates <- integer(0)
+  # for (node in nodes_in_zone) {
+  #   #Get their coordinates (nodes_in_zone)
+  #   l <- l+1
+  #   if (node %in% edges$ind1){
+  #     point <- unique(edges %>% filter(ind1 == node) %>% select(x1, y1))
+  #   } else {
+  #     point <- unique(edges %>% filter(ind2 == node) %>% select(x1 = x2, y1 = y2))
+  #   }
+  #   dist_to_edge[l] <- distancePointSegment(px = point$x1, py <- point$y1, x1 = current_line$x1, x2 = current_line$x2, y1 = current_line$y1, y2 = current_line$y2)
+  #   # Add the nodes in the zone, that are within viewing distance
+  #   if (dist_to_edge[l] < r){
+  #     # Nodes in zone within viewing distance
+  #     candidates <- append(candidates, node)
+  #   }
+  # }
+  # Use all in zone instead of radius
+  candidates <- nodes_in_zone
+  # Update realized score depending on other visited nodes
+  for (node_i in route) {
+    # If a node has an unexpectedly high/low realized score the related nodes are updated
+    if (map$unexpected[node_i]) {
+      other_nodes <- map$id[-node_i]
+      for (node_j in other_nodes) {
+        # TODO: Update with real relation factor between scores
+        corr = 1
+        map$realized_score[node_j] <- (map$realized_score)[node_j] + corr * (map$realized_score)[node_i]
+      }
+      map$unexpected[node_i] <- FALSE
     }
   }
   # Evaluate how good the next planned node to be visited is when using realized score
@@ -244,7 +261,6 @@ while(length(remaining_nodes) != 0){
       # handle the case of candidate being equal to remaining_nodes[2]
       realized_score <- map$realized_score[sp_node]
       if (length(realized_score) == 0) {realized_score <- map$realized_score[candidate]}
-
       s_cand_tot[candidate] <- s_cand_tot[candidate] + realized_score
     }
     # Summarized
@@ -299,6 +315,7 @@ while(length(remaining_nodes) != 0){
   remaining_nodes <- remaining_nodes[remaining_nodes != (remaining_nodes[1])]
   if (length(remaining_nodes) == 0) {break}
   if (route[length(route)] == remaining_nodes[1]) {remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]}
+  L_remaining <- L - route_length(route = route)
 }
 
 plot_progress()
