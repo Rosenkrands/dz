@@ -37,7 +37,7 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
   # Dist function that returns only the points in the path
   dist2 <- function(id1, id2, g){
     # Find vertices that make up the path
-    if (id1 == id2) return(0)
+    if (id1 == id2) return(id1)
     short_vert <- as.vector(igraph::shortest_paths(graph = g, from = id1, to = id2, output = "vpath")$vpath[[1]])
     return(short_vert)
   }
@@ -268,7 +268,7 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
     cat("Starting the route updating loop...\n")
     node_nr = 0
     while (!is.na(route[node_nr+2])) {
-      node_nr <- node_nr +1; cat("node_nr is", node_nr)#; if(node_nr == 20) stop()
+      node_nr <- node_nr +1; cat("node_nr is", node_nr); if(node_nr == 16) stop()
     # }
     # for (node_nr in 1:(length(route)-2)){
       # Get nodes with edges to this node
@@ -331,11 +331,14 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
           # dist(candidates[i], temp_short_path2[length(temp_short_path2)], g = g)
         # Realized score
         # s[i] <- (map$score_variance)[candidates[i]]
-        s[i] <- route_score(route = route_temp, id_next_placement = node_nr + 1)
+        s[i] <- route_score(route = route_temp, id_next_placement = node_nr + 1 + length(temp_short_path2))
         # Updated SDR
         SDR[candidates[i]] <- s[i]/d[i]
+        if ((route_length(route_temp)) > 300) {SDR[candidates[i]] = 0}
       }
       New_point <- which.max(SDR)
+      # Update node_nr according to number of nodes added to accomodate New_point
+      node_nr <- node_nr + (length(dist2(id_next, New_point,g=g))-2)
       # Chose best new route if it is better than original
       d_temp <- vector()
       s_temp <- vector()
@@ -374,6 +377,7 @@ routing <- function(clust, obj = "SDR", L = 300, variances) {
             map[node,]$realized_score <- 0
           }
         }
+        ### Update node_nr according to how much shortest path to candidate was added
         route
       }
     }
