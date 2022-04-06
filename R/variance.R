@@ -11,15 +11,17 @@
 #'
 generate_variances <- function(inst, distribution = "discrete_uniform", bounds = c("min" = 10, "max" = 40)) {
   # For testing purposes:
-  # inst <- test_instances$p7_chao; distribution = "discrete_uniform"; bounds = c("min" = 10, "max" = 40)
+  # inst <- dz::test_instances$p7_chao; distribution = "discrete_uniform"; bounds = c("min" = 10, "max" = 40)
 
   ids <- inst$points |>
     dplyr::filter(point_type == "intermediate") |>
     dplyr::select(id)
 
   sds <- round(runif(nrow(ids), min = bounds["min"], max = bounds["max"]))
+  p_unexpected <- runif(nrow(ids), min = 0, max = 1)
 
   ids$score_variance <- sds
+  ids$p_unexpected <- p_unexpected
 
   return(ids)
 }
