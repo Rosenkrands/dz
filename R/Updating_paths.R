@@ -114,7 +114,8 @@ clust <- readRDS("clust_ls.rds"); obj = "SDR"; L = 200
 map <- clust$instance$points |>
   dplyr::rowwise() |>
   dplyr::mutate(realized_score = ifelse(is.na(score_variance), NA, rnorm(1, mean = score, sd = sqrt(score_variance)))) |>
-  dplyr::mutate(unexpected = (realized_score > (score+1.96*sqrt(score_variance))) | (realized_score < (score-1.96*sqrt(score_variance))))
+  dplyr::mutate(unexpected = rbernoulli(1, p = p_unexpected))
+  # dplyr::mutate(unexpected = (realized_score > (score+1.96*sqrt(score_variance))) | (realized_score < (score-1.96*sqrt(score_variance))))
 map$realized_score[1] <- 0
 map$unexpected[1] <- FALSE
 edges <- clust$same_zone_edges |> dplyr::filter(zone == zone_id)
@@ -172,7 +173,7 @@ route_score <- function(route, id_next_placement) {
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-L <- 200
+L <- 220
 initial_route <- solve_routing(L = L)
 remaining_route <- initial_route$route
 remaining_nodes <- c(remaining_route[3:length(remaining_route)])
