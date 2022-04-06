@@ -4,16 +4,16 @@
 \alias{initial_route}
 \title{Generation of inital routes as part of the pre-mission clustering}
 \usage{
-initial_route(inst, L, r, variances)
+initial_route(inst, L, variances, info)
 }
 \arguments{
 \item{inst}{Instance object returned from the `instance` function}
 
 \item{L}{The range for each agent (homogenous agents are assumed)}
 
-\item{r}{The radius from a node that profits will be realized}
-
 \item{variances}{A set of variances returned from the `generate_variances` function}
+
+\item{r}{The radius from a node that profits will be realized}
 }
 \value{
 A route satisfying the range constraint, represented as an integer vector

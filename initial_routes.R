@@ -2,7 +2,7 @@
 # set.seed(1)
 
 # Parameters
-inst = dz::test_instances$p7_chao; L = 150; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20)
+inst = dz::test_instances$p7_chao; L = 100; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20)
 
 # Generation of initial routes
 message("Generating the initial routes")
@@ -107,6 +107,8 @@ for (i in 1:k) {
 
   zones[[i]] <- unique(c(1, ids))
 }
+
+# plot_zones()
 
 # Determine if a zone is connected
 connected <- function(zone) {
