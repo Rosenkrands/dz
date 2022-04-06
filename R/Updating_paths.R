@@ -172,12 +172,10 @@ route_score <- function(route, id_next_placement) {
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-# r <- 100
-# remaining_route <- c(1, 40, 42, 63, 85, 14, 22, 1)
-L <- 160
+L <- 200
 initial_route <- solve_routing(L = L)
 remaining_route <- initial_route$route
-remaining_nodes <- c(remaining_route[3:length(remaining_route)], 1)
+remaining_nodes <- c(remaining_route[3:length(remaining_route)])
 route <- remaining_route[1:2]
 print(plot_progress())
 nodes_in_zone <- (map %>% filter(zone == 1))$id
@@ -210,6 +208,7 @@ while(length(remaining_nodes) != 0){
     }
   }
   # Evaluate how good the next planned node to be visited is when using realized score
+  if(is.na(remaining_nodes[2])) {remaining_nodes[2] <- 1}
   d_planned_realized <- dist(id_next, remaining_nodes[1],  g = g) +
     dist(remaining_nodes[1], remaining_nodes[2], g = g)
   s_planned_realized <- map$realized_score[(remaining_nodes[1])] + map$realized_score[(remaining_nodes[2])]
@@ -258,6 +257,7 @@ while(length(remaining_nodes) != 0){
     SDR_cand[New_point] <- 0
     New_point <- which.max(SDR_cand)
     L_required <- dist(id_next, New_point, g = g) + dist(New_point, remaining_nodes[2], g = g)
+    if (New_point == 1) {break}
   }
   if ((max(SDR_cand) > SDR_planned_realized) & !(New_point %in% remaining_route) & (L_remaining > L_required) ){
     # Remove the node that would originally be visited after id_next
@@ -289,5 +289,17 @@ while(length(remaining_nodes) != 0){
   if (length(remaining_nodes) == 0) {break}
   if (route[length(route)] == remaining_nodes[1]) {remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]}
 }
+if(route[length(route)] != 1){
+  route <- route[1:(length(route)-1)]
+  sp_home <- dist2(id_next, 1, g = g)
+  route <- append(route, sp_home[2:length(sp_home)])
+}
 
 plot_progress()
+
+
+
+
+
+
+
