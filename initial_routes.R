@@ -1,12 +1,18 @@
-library(dz)
-set.seed(1)
-inst = test_instances$p7_chao; L = 200; r = 10; variances = generate_variances(inst = inst)
+# library(dz)
+# set.seed(1)
 
-routes <- 1:100 |> as.list() |> pbapply::pblapply(function(x) {initial_route(inst, L, r, variances)})
+# Parameters
+inst = dz::test_instances$p7_chao; L = 150; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20)
+
+# Generation of initial routes
+message("Generating the initial routes")
+routes <- 1:200 |> as.list() |> pbapply::pblapply(function(x) {initial_route(inst, L, variances, info)})
 
 inst$points <- inst$points |>
   dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
 
+# Perform the clustering
+message("Performing the clustering")
 compute_dissimilarity <- function(i,j) {
   nodes_i <- unique(routes[[i]])
   nodes_j <- unique(routes[[j]])
@@ -22,26 +28,11 @@ for (i in 1:n) {
   }
 }
 
-hc <- stats::hclust(as.dist(dissimilarity))
-plot(hc)
-
 k = 3
-
+hc <- stats::hclust(as.dist(dissimilarity))
 cluster <- cutree(hc, k)
 
-# for plotting
-route_segments <- tibble::tibble(routes, cluster) |>
-  tidyr::unnest(routes) |>
-  dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
-  dplyr::filter(!is.na(id_start)) |>
-  dplyr::select(-routes) |>
-  dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
-                    by = c("id_start" = "id")) |>
-  dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
-                    by = c("id_end" = "id"), suffix = c("","end")) |>
-  dplyr::group_by(cluster,x,y,xend,yend) |>
-  dplyr::summarise(n = dplyr::n())
-
+# Investigate where to place disputed points, based on most frequent use
 route_info <- tibble::tibble(id = routes, cluster, route_id = 1:length(routes))
 
 route_count <- route_info |>
@@ -59,38 +50,52 @@ node_usage <- route_info |>
   dplyr::mutate(disputed = ifelse(num_cluster_use > 1, 1, 0)) |>
   dplyr::ungroup()
 
-# Plot the segment on the existing plot
-ggplot2::ggplot() +
-  # ggplot2::geom_segment(
-  #   data = inst$edges,
-  #   ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
-  #   color = ggplot2::alpha("black", 0.3), linetype = "dashed"
-  # ) +
-  ggplot2::geom_segment(
-    data = route_segments,
-    ggplot2::aes(x=x, y=y, xend=xend, yend=yend, color = as.character(cluster), alpha = n),
-  ) +
-  ggplot2::geom_point(
-    data = inst$points |> dplyr::filter(point_type == "terminal"),
-    ggplot2::aes(x, y), color = "red", shape = 17
-  ) +
-  ggplot2::geom_point(
-    data = inst$points |>
-      dplyr::filter(point_type == "intermediate") |>
-      dplyr::inner_join(node_usage, by = c("id")),
-    ggplot2::aes(x, y, shape = as.character(disputed))
-  ) +
-  ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
-  ggplot2::theme_bw() +
-  ggplot2::guides(
-    shape = "none",
-    fill = "none",
-    color = "none"
-  )
+# # for plotting
+# route_segments <- tibble::tibble(routes, cluster) |>
+#   tidyr::unnest(routes) |>
+#   dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
+#   dplyr::filter(!is.na(id_start)) |>
+#   dplyr::select(-routes) |>
+#   dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
+#                     by = c("id_start" = "id")) |>
+#   dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
+#                     by = c("id_end" = "id"), suffix = c("","end")) |>
+#   dplyr::group_by(cluster,x,y,xend,yend) |>
+#   dplyr::summarise(n = dplyr::n())
+
+# # Plot the segment on the existing plot
+# ggplot2::ggplot() +
+#   # ggplot2::geom_segment(
+#   #   data = inst$edges,
+#   #   ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+#   #   color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+#   # ) +
+#   ggplot2::geom_segment(
+#     data = route_segments,
+#     ggplot2::aes(x=x, y=y, xend=xend, yend=yend, color = as.character(cluster)),
+#   ) +
+#   ggplot2::geom_point(
+#     data = inst$points |> dplyr::filter(point_type == "terminal"),
+#     ggplot2::aes(x, y), color = "red", shape = 17
+#   ) +
+#   ggplot2::geom_point(
+#     data = inst$points |>
+#       dplyr::filter(point_type == "intermediate") |>
+#       dplyr::inner_join(node_usage, by = c("id")),
+#     ggplot2::aes(x, y, shape = as.character(disputed))
+#   ) +
+#   ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
+#   ggplot2::theme_bw() +
+#   ggplot2::guides(
+#     shape = "none",
+#     fill = "none",
+#     color = "none"
+#   )
+
 
 # Assign disputed points to clusters
 # First we find points that are only used by one cluster
-
+message("resolving zoning conflicts")
 zones <- list()
 
 for (i in 1:k) {
@@ -103,59 +108,17 @@ for (i in 1:k) {
   zones[[i]] <- unique(c(1, ids))
 }
 
-# Figure out how to ensure that each zone is connected
+# Determine if a zone is connected
 connected <- function(zone) {
   # zone <- zones[[1]]
   sub_g <- igraph::induced_subgraph(inst$g, vids = zone)
   igraph::is_connected(sub_g, mode = "weak") # check for undirected path between pairs of vertices
 }
 
+# Check the connectedness of each zone
 lapply(zones, connected)
 
-available_nodes <- integer()
-
-# Figure out how to make zones connected
-for (i in 1:k) {
-  # Make the sub graph induced by each zone
-  sub_g <- igraph::induced_subgraph(inst$g, vids = zones[[i]])
-  if (!igraph::is_connected(sub_g, mode = "weak")) {
-    # The problem is the nodes that are not connected to the source,
-    # nodes that are not connected to the source will have distance == Inf
-    temp_dst <- igraph::distances(sub_g, v = 1) # calculate distances
-    unconnected <- igraph::V(sub_g)[temp_dst == Inf] |> # get the node id for nodes with distance == Inf
-      names() |> as.integer()
-
-    # Idea: discard the nodes from the zone and see if we can add them to another zone
-    available_nodes <- append(available_nodes, unconnected)
-    zones[[i]] <- zones[[i]][!zones[[i]] %in% unconnected]
-  }
-}
-
-# iterate through the available nodes and see if we can find another zone for them
-while (length(available_nodes) > 0) {
-  for (i in 1:k) {
-    # print(paste0("i is: ", i))
-    # check along the way if we have assigned all available nodes
-    if (length(available_nodes) == 0) break
-
-    for (j in 1:length(available_nodes)) {
-      # print(paste0("j is: ", j))
-      # print(paste0("available nodes is: ", available_nodes))
-      if (length(available_nodes) == 0) break
-
-      # temp_zone is zone i along with the next available node
-      temp_zone <- append(zones[[i]], available_nodes[1])
-      sub_g <- igraph::induced_subgraph(inst$g, vids = temp_zone)
-      if (igraph::is_connected(sub_g, mode = c("weak"))) {
-        # if temp_zone is weakly connected we add the available node to this zone
-        zones[[i]] <- temp_zone
-        available_nodes <- available_nodes[-1]
-        if (length(available_nodes) == 0) break
-      }
-    }
-  }
-}
-
+# plot the initial zones
 # function to plot zones list
 plot_zones <- function() {
   temp <- tibble::tibble(id = zones, agent_id = 1:k) |>
@@ -190,5 +153,64 @@ plot_zones <- function() {
       color = "none"
     )
 }
+plot_zones()
 
+# de-zone points that are not connected to the source through its own zone
+available_nodes <- integer()
+
+for (i in 1:k) {
+  # Make the sub graph induced by each zone
+  sub_g <- igraph::induced_subgraph(inst$g, vids = zones[[i]])
+  if (!igraph::is_connected(sub_g, mode = "weak")) {
+    # The problem is the nodes that are not connected to the source,
+    # nodes that are not connected to the source will have distance == Inf
+    temp_dst <- igraph::distances(sub_g, v = 1) # calculate distances
+    unconnected <- igraph::V(sub_g)[temp_dst == Inf] |> # get the node id for nodes with distance == Inf
+      names() |> as.integer()
+
+    # Idea: discard the nodes from the zone and see if we can add them to another zone
+    available_nodes <- append(available_nodes, unconnected)
+    zones[[i]] <- zones[[i]][!zones[[i]] %in% unconnected]
+  }
+}
+
+# Plot zones with isolated points removed from their respective zone
+plot_zones()
+
+# iterate through the available nodes and see if we can find another zone for them
+# IDEA: this could be done using the local search components from the clustering setup
+n_available_nodes <- length(available_nodes)
+message(paste0("found ", n_available_nodes, " conflicts"))
+
+while (length(available_nodes) > 0) {
+  for (i in 1:k) {
+    # print(paste0("zone is: ", i))
+    # check along the way if we have assigned all available nodes
+    if (length(available_nodes) == 0) break
+
+    added_nodes <- integer()
+    for (j in 1:length(available_nodes)) {
+      # print(paste0("j is: ", j))
+      # print(paste0("available nodes is: ", available_nodes))
+      if (length(available_nodes) == 0) break
+
+      # temp_zone is zone i along with the next available node
+      temp_zone <- append(zones[[i]], available_nodes[j])
+      sub_g <- igraph::induced_subgraph(inst$g, vids = temp_zone)
+      if (igraph::is_connected(sub_g, mode = c("weak"))) {
+        # print(paste0("The node ", available_nodes[j], " can be added"))
+        # if temp_zone is weakly connected we add the available node to this zone
+        zones[[i]] <- temp_zone
+        added_nodes <- append(added_nodes, available_nodes[j])
+        if (length(available_nodes) == 0) break
+      }
+    }
+    # print(paste0("added nodes are: ", added_nodes))
+    available_nodes <- available_nodes[!available_nodes %in% added_nodes]
+  }
+}
+message("conflicts resolved")
+message("all done")
+
+# Plot the zones again with the points added to other zones
 plot_zones()
