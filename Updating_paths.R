@@ -150,40 +150,18 @@ dist2 <- function(id1, id2, g){
 #   edges$ind2[i] <- route_info$lookup$id[edges$ind2[i]]
 # }
 
-### Function for route length
-route_length <- function(route) {
-  distance_temp <- vector(length = length(route)-1)
-  for (placement in (1):(length(route)-1)) {
-    distance_temp[placement] <- dist(route[placement], route[placement + 1], dst = dst)
-  }
-  return(sum(distance_temp))
-}
-#
 
-### Function for route score
-# Use placement of id_next instead of the node id
-route_score <- function(route, id_next_placement) {
-  # route <- unique(route)
-  score_temp_realized <- vector(length = id_next_placement)
-  score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
-  for (placement in (1):(length(score_temp_realized)-1)) {
-    score_temp_realized[placement] <- map$score_variance[placement]
-  }
-  for (placement in (1):(length(score_temp_expected)-1)) {
-    score_temp_expected[placement] <- map$score[placement]
-  }
-  return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
-}
+#
 
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-initial_route = rout$routing_results$routes[[2]]; zone_id = 2; L = rout$L; L_remaining = rout$routing_results$L[2]
-set.seed(10)
+initial_route = rout$routing_results$routes[[4]]; zone_id = 4; L = rout$L; L_remaining = rout$routing_results$L[4]
+set.seed(11)
 update_routing <- function(initial_route, zone_id, L, L_remaining) {
   clust <- readRDS("clust_ls.rds")
-
-  variances <- generate_variances(clust$instance)
+  set.seed(1)
+  (variances <- generate_variances(clust$instance))
 
   map <- clust$instance$points |>
     dplyr::select(-score_variance) |>
@@ -215,6 +193,30 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
   print(plot_progress())
   nodes_in_zone <- zone
   # L_remaining <- initial_route$L_remaining
+
+  ### Function for route length
+  route_length <- function(route) {
+    distance_temp <- vector(length = length(route)-1)
+    for (placement in (1):(length(route)-1)) {
+      distance_temp[placement] <- dist(route[placement], route[placement + 1], dst = dst)
+    }
+    return(sum(distance_temp))
+  }
+
+  ### Function for route score
+  # Use placement of id_next instead of the node id
+  route_score <- function(route, id_next_placement) {
+    # route <- unique(route)
+    score_temp_realized <- vector(length = id_next_placement)
+    score_temp_expected <- vector(length = (length(route) - (id_next_placement)))
+    for (placement in (1):(length(score_temp_realized)-1)) {
+      score_temp_realized[placement] <- map$realized_score[placement]
+    }
+    for (placement in (1):(length(score_temp_expected)-1)) {
+      score_temp_expected[placement] <- map$score[placement]
+    }
+    return(sum(score_temp_realized, na.rm = T) + sum(score_temp_expected, na.rm = T))
+  }
 
   while(length(remaining_nodes) != 0){
     cat("The route so far:", "\n")
