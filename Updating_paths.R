@@ -1,7 +1,6 @@
 library(tidyverse)
 library(dz)
-
-# zone_id = 1
+library(igraph)
 
 # function to plot progress of routing
 plot_progress <- function() {
@@ -159,6 +158,7 @@ route_length <- function(route) {
   }
   return(sum(distance_temp))
 }
+#
 
 ### Function for route score
 # Use placement of id_next instead of the node id
@@ -178,8 +178,8 @@ route_score <- function(route, id_next_placement) {
 ### New function purely for updating the path when an alternative route becomes better
 ### due to deviation in realized_score compared to expected score
 
-initial_route = rout$routing_results$routes[[1]]; zone_id = 1; L = rout$L; L_remaining = rout$routing_results$L[1]
-
+initial_route = rout$routing_results$routes[[2]]; zone_id = 2; L = rout$L; L_remaining = rout$routing_results$L[2]
+set.seed(10)
 update_routing <- function(initial_route, zone_id, L, L_remaining) {
   clust <- readRDS("clust_ls.rds")
 
@@ -213,13 +213,18 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
   remaining_nodes <- c(remaining_route[3:length(remaining_route)])
   route <- remaining_route[1:2]
   print(plot_progress())
-  nodes_in_zone <- (map %>% filter(zone == 1))$id
+  nodes_in_zone <- zone
   # L_remaining <- initial_route$L_remaining
 
   while(length(remaining_nodes) != 0){
+    cat("The route so far:", "\n")
+    print(route)
+    cat("Route based on original that can still be followed:", "\n" )
+    print(remaining_route)
     # Keep track of changes
     last_remaining_route <- remaining_route
     # Node the UAV flew from
+    # if (remaining_route[1] == 86){break}
     id_now <- remaining_route[1]
     cat("now, next", "\n")
     print(id_now)
@@ -295,9 +300,11 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
       L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst)
       if (New_point == 1) {break}
     }
+    # if (remaining_route[1] == remaining_route[3]) {remaining_route <- remaining_route[3:length(remaining_route)]}
     if ((max(SDR_cand) > SDR_planned_realized) & !(New_point %in% remaining_route) & (L_remaining > L_required) ){
       # Remove the node that would originally be visited after id_next
-      remaining_route <- remaining_route[remaining_route != remaining_nodes[1]]
+      map$realized_score[New_point] <- 0
+      remaining_route <- remaining_route[2:(length(remaining_route))]
       # Add new
       sp <- c(dist2(id_next, New_point, g = g)[2:(length(dist2(id_next, New_point, g = g)))],
               (dist2(New_point, remaining_nodes[2], g = g)[2:((length(dist2(New_point, remaining_nodes[2], g = g))))]))
@@ -305,7 +312,8 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
       map$realized_score[sp] <- 0
       print(sp)
       # Remove the extra start of end of original
-      remaining_route <- remaining_route[remaining_route != (remaining_nodes[2])]
+      # remaining_route <- remaining_route[remaining_route != (remaining_nodes[2])]
+      remaining_route <- c(remaining_route[1], remaining_route[3:(length(remaining_route))])
       remaining_route <- append(remaining_route, sp, after = 2)
       longer_than_original <- longer_than_original + (length(remaining_route) - length(last_remaining_route))
       if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
@@ -315,15 +323,23 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
       cat("Added a node not in original route", "\n")
       print(New_point)
     } else {
-      if (is.na(remaining_route[3])) {route <- append(route, c(remaining_route[2], 1)); break}
+      if (is.na(remaining_route[3])) {
+        cat("Remaining route:", "\n")
+        print(remaining_route)
+        # route <- route[1:(length(route)-1)]
+        sp_home <- dist2(id_next, 1, g = g)
+        route <- append(route, sp_home[2:length(sp_home)])
+        break
+      }
+      # Go where we would anyway
       route <- append(route, remaining_route[3])
       # Update remaining_route by removing the ones already visited (excluding id_now and id_next for the next iteration)
-      remaining_route <- remaining_route[remaining_route != remaining_route[1]]
+      remaining_route <- remaining_route[2:(length(remaining_route))]
     }
     # Update remaining_nodes
     remaining_nodes <- remaining_nodes[remaining_nodes != (remaining_nodes[1])]
     if (length(remaining_nodes) == 0) {break}
-    if (route[length(route)] == remaining_nodes[1]) {remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]}
+    if ((route[length(route)]) == (remaining_nodes[1])) {remaining_nodes <- remaining_nodes[remaining_nodes != remaining_nodes[1]]}
   }
   if(route[length(route)] != 1){
     route <- route[1:(length(route)-1)]
@@ -331,9 +347,13 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
     route <- append(route, sp_home[2:length(sp_home)])
   }
   # Return L and Score with the routes
-  output <- list("route" = route, "L_remaining" = L_remaining, "s_total" = route_score(route, id_next_placement = length(route)))
+  print(plot_progress())
+  output <- list("route" = route, "s_total" = route_score(route, id_next_placement = length(route)))
   return(output)
 }
+# TEST for one zone at a time
+z <- 4
+update_routing(initial_route = rout$routing_result$routes[[z]], L = rout$L, L_remaining = rout$routing_results$L[z], zone_id = z)
 
 # Use lapply to perform update for all clusters
 updated_route_list <- lapply(
