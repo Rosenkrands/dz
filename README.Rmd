@@ -1,5 +1,7 @@
 ---
 output: github_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
@@ -47,8 +49,10 @@ length(test_instances)
 ```
 
 ```{r plot_test_instance}
-inst <- test_instances$p7_chao 
-plot(inst, delaunay = T, voronoi = F)
+set.seed(123)
+inst <- test_instances$p7_chao
+
+plot(inst, delaunay = T)
 ```
 
 ## Clustering
@@ -59,9 +63,16 @@ As of now there are two methods to perform the clustering; the greedy approach a
 Below we can see the resulting clusters from the greedy approach.
 
 ```{r perform_clustering_gr, cache = T, echo = F, results = F}
+variances <- generate_variances(inst, bounds = c("min" = 10, "max" = 100))
+info <- generate_information(inst, r = 20)
+
 clust_gr <- clustering(
   inst = inst,
   k = 4,
+  L = 80,
+  eps = 0,
+  variances = variances,
+  info = info,
   cluster_method = "greedy"
 )
 
@@ -72,11 +83,19 @@ plot(clust_gr)
 The local search approach tries to improve on the greedy approach using an insertion operator.
 Resulting clusters from the local search approach are shown below.
 
-```{r perform_clustering_ls, cache = T, echo = F, message = F, results = F}
-clust_ls <- clustering(
-  inst = inst,
-  k = 4,
-  cluster_method = "local_search"
+```{r perform_clustering_ls, echo=F, message=FALSE, cache=TRUE}
+set.seed(33)
+suppressMessages(
+  clust_ls <- clustering(
+    inst = inst,
+    k = 4,
+    L = 80,
+    eps = 0,
+    variances = variances,
+    info = info,
+    cluster_method = "local_search",
+    alpha = 1
+  )
 )
 
 # saveRDS(clust_ls, file = "clust_ls.rds")
@@ -90,18 +109,8 @@ In the below animation we can see how the initial clustering in iteratively impr
 
 The animation is created using `animate_local_search(clust_ls)`.
 
-## Routing
+## Routing based clustering
 
-Given an instance with clusters we are able to find a set of routes using the `routing` function.
-
-```{r perform_routing, cache = T}
-# clust_ls <- readRDS("clust_ls.rds"); obj = "SDR"; L = 500
-
-rout <- routing(
-  clust = clust_ls,
-  obj = "SDR",
-  L = 500
-)
-
-plot(rout)
+```{r}
+# TODO...
 ```
