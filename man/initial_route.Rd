@@ -13,7 +13,7 @@ initial_route(inst, L, variances, info)
 
 \item{variances}{A set of variances returned from the `generate_variances` function}
 
-\item{r}{The radius from a node that profits will be realized}
+\item{info}{An information matrix returned by the `generate_information` function}
 }
 \value{
 A route satisfying the range constraint, represented as an integer vector
