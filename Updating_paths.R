@@ -157,11 +157,9 @@ dist2 <- function(id1, id2, g){
 ### due to deviation in realized_score compared to expected score
 
 initial_route = rout$routing_results$routes[[4]]; zone_id = 4; L = rout$L; L_remaining = rout$routing_results$L[4]
-set.seed(11)
 update_routing <- function(initial_route, zone_id, L, L_remaining) {
   clust <- readRDS("clust_ls.rds")
-  set.seed(1)
-  (variances <- generate_variances(clust$instance))
+  variances <- generate_variances(clust$instance)
 
   map <- clust$instance$points |>
     dplyr::select(-score_variance) |>
@@ -291,11 +289,11 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
     cat("New_point:", "\n")
     print(New_point)
     # Add and remove these from the route according to (shortest paths) SDR
-    # We remove two and add at least two, so we need to track route
+    # We remove two and add at least two, so we need to track how many more we add to route
     longer_than_original <- 0
     # Check length constraint
     L_remaining <- L - route_length(route = route)
-    L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst)
+    L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst) + dist(remaining_nodes[2], 1, dst = dst)
     while (L_remaining < L_required) {
       SDR_cand[New_point] <- 0
       New_point <- which.max(SDR_cand)
@@ -303,7 +301,9 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
       if (New_point == 1) {break}
     }
     # if (remaining_route[1] == remaining_route[3]) {remaining_route <- remaining_route[3:length(remaining_route)]}
-    if ((max(SDR_cand) > SDR_planned_realized) & !(New_point %in% remaining_route) & (L_remaining > L_required) ){
+    cat("Remaining length:", "\n")
+    print(L_remaining)
+    if ((max(SDR_cand) > SDR_planned_realized)  & !(New_point %in% remaining_route) & (L_remaining > L_required) ){
       # Remove the node that would originally be visited after id_next
       map$realized_score[New_point] <- 0
       remaining_route <- remaining_route[2:(length(remaining_route))]
@@ -345,6 +345,9 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
   }
   if(route[length(route)] != 1){
     route <- route[1:(length(route)-1)]
+    if(!(New_point %in% remaining_route) & (New_point %in% route)){
+      route <- append(route, New_point)
+    }
     sp_home <- dist2(id_next, 1, g = g)
     route <- append(route, sp_home[2:length(sp_home)])
   }
@@ -354,7 +357,7 @@ update_routing <- function(initial_route, zone_id, L, L_remaining) {
   return(output)
 }
 # TEST for one zone at a time
-z <- 4
+z <- 2
 update_routing(initial_route = rout$routing_result$routes[[z]], L = rout$L, L_remaining = rout$routing_results$L[z], zone_id = z)
 
 # Use lapply to perform update for all clusters
