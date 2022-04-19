@@ -4,7 +4,7 @@
 \alias{fix_connectivity}
 \title{Fix connectivity in zones}
 \usage{
-fix_connectivity(zones)
+fix_connectivity(inst, zones)
 }
 \arguments{
 \item{zones}{}

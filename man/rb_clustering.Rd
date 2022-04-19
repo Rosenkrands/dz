@@ -4,7 +4,16 @@
 \alias{rb_clustering}
 \title{Routing based clustering}
 \usage{
-rb_clustering(inst, L, k, variances, info)
+rb_clustering(
+  inst,
+  L,
+  k,
+  num_routes,
+  variances,
+  info,
+  dispute_obj = "most_frequent",
+  shiny = F
+)
 }
 \arguments{
 \item{info}{}
