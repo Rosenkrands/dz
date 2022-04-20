@@ -22,5 +22,8 @@ generate_information <- function(inst, r = 20) {
   info[!is.finite(info)] <- 0
   info[inst$dst > r] <- 0
 
+  # scale according to expected score
+  info <- info * inst$points$score
+
   return(info)
 }
