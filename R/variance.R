@@ -18,7 +18,7 @@ generate_variances <- function(inst, distribution = "discrete_uniform", bounds =
     dplyr::select(id)
 
   sds <- round(runif(nrow(ids), min = bounds["min"], max = bounds["max"]))
-  p_unexpected <- runif(nrow(ids), min = 0, max = 1)
+  p_unexpected <- runif(nrow(ids), min = 0, max = .5)
 
   ids$score_variance <- sds
   ids$p_unexpected <- p_unexpected
