@@ -13,6 +13,7 @@ initial_route <- function(inst, L, variances, info) {
   # inst = test_instances$p7_chao; L = 100; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20)
   L_remaining <- L
 
+  # TODO: make a function to do this
   inst$points <- inst$points |>
     dplyr::left_join(variances, by = c("id")) |>
     dplyr::rowwise() |>
@@ -97,8 +98,9 @@ initial_route <- function(inst, L, variances, info) {
           if (inst$points$unexpected[j]) {
             related_nodes <- which(info[j,] != 0) # find the nodes that are related
             for (k in related_nodes) { # update both score and realized scores for all related nodes
-              inst$points$realized_score[k] <- inst$points$realized_score[k] + info[j,k] * inst$points$realized_score[j]
-              inst$points$score[k] <- inst$points$score[k] + info[j,k]*inst$points$score[j]
+              # Realized score should already be updated beforehand
+              # inst$points$realized_score[k] <- inst$points$realized_score[k] + info[j,k]
+              inst$points$score[k] <- inst$points$score[k] + info[j,k]
             }
             inst$points$unexpected[j] <- F
           }
@@ -299,7 +301,7 @@ resolve_disputes <- function(init_routes, cluster, obj = "most_frequent") {
 #' @return
 #' @export
 #'
-fix_connectivity <- function(inst, zones) {
+fix_connectivity <- function(inst, zones, available_nodes = integer()) {
   k <- length(zones)
 
   # function to determine if a zone is connected
@@ -314,7 +316,8 @@ fix_connectivity <- function(inst, zones) {
 
   if (!all(are_connected)) {
     # de-zone points that are not connected to the source through its own zone
-    available_nodes <- integer()
+    # available_nodes <- integer()
+    if (length(available_nodes) > 0) stop("not all zones are connected but available nodes was provided. Please fix the connectivity issue before providing available nodes.")
 
     for (i in 1:k) {
       # Make the sub graph induced by each zone
@@ -331,65 +334,69 @@ fix_connectivity <- function(inst, zones) {
         zones[[i]] <- zones[[i]][!zones[[i]] %in% unconnected]
       }
     }
+  }
 
-    # save number of nodes with connectivity issues
-    num_issues <- length(available_nodes)
+  # save number of nodes with connectivity issues
+  num_issues <- length(available_nodes)
 
-    # make function to evaluate each zone based on objective
-    avg_dist <- function(zone) {
-      # subset the distance matrix (of shortest paths) to only nodes in the zone
-      dst_temp <- inst$dst[zone, zone]
-      # return the mean distance between nodes in the zone
-      mean(dst_temp[lower.tri(dst_temp, diag = F)])
-    }
+  # make function to evaluate each zone based on objective
+  avg_dist <- function(zone) {
+    # subset the distance matrix (of shortest paths) to only nodes in the zone
+    dst_temp <- inst$dst[zone, zone]
+    # return the mean distance between nodes in the zone
+    mean(dst_temp[lower.tri(dst_temp, diag = F)])
+  }
+  # do.call(sum, lapply(zones, avg_dist))
 
-    # do.call(sum, lapply(zones, avg_dist))
-
-    while (length(available_nodes) > 0) {
-      # Check the result of inserting an available node into each zone
-      candidates <- list(); l = 0
-
-      for (i in available_nodes) {
-        for (j in 1:k) {
-          # cat("i is:", i, "j is:", j, "\n")
-          l = l + 1
-          # add available node to the zone
-          temp_zones <- zones
-          temp_zones[[j]] <- append(temp_zones[[j]], i)
-
-          # see if the zone is connected
-          sub_g <- igraph::induced_subgraph(inst$g, vids = temp_zones[[j]])
-          connected <- igraph::is_connected(sub_g, mode = c("weak"))
-
-          # calculate the average distance
-          if (connected) {
-            zone_avg_dist <- avg_dist(temp_zones[[j]])
-          } else {
-            zone_avg_dist <- NA
-          }
-
-          candidates[[l]] <- tibble::tibble(
-            available_node = i, zone = j, is_connected = connected, avg_dist = zone_avg_dist
-          )
-        }
-      }
-
-      best_candidate <- do.call(dplyr::bind_rows, candidates) |>
-        dplyr::filter(is_connected == T) |>
-        dplyr::filter(avg_dist == min(avg_dist))
-
-      if (nrow(best_candidate) < 1) {
-        warning("there are no best candidate")
-        # TODO: handle no candidate is_connected
-      }
-
-      zones[[best_candidate$zone]] <- append(
-        zones[[best_candidate$zone]], best_candidate$available_node
-      )
-      available_nodes <- available_nodes[available_nodes != best_candidate$available_node]
-    }
-  } else { # All zones were already connected
+  if (!all(are_connected) & (length(available_nodes) == 0)) {
     num_issues <- 0
+    return(
+      list("zones" = zones, "num_issues" = num_issues)
+    )
+  }
+
+  while (length(available_nodes) > 0) {
+    # Check the result of inserting an available node into each zone
+    candidates <- list(); l = 0
+
+    for (i in available_nodes) {
+      for (j in 1:k) {
+        # cat("i is:", i, "j is:", j, "\n")
+        l = l + 1
+        # add available node to the zone
+        temp_zones <- zones
+        temp_zones[[j]] <- append(temp_zones[[j]], i)
+
+        # see if the zone is connected
+        sub_g <- igraph::induced_subgraph(inst$g, vids = temp_zones[[j]])
+        connected <- igraph::is_connected(sub_g, mode = c("weak"))
+
+        # calculate the average distance
+        if (connected) {
+          zone_avg_dist <- avg_dist(temp_zones[[j]])
+        } else {
+          zone_avg_dist <- NA
+        }
+
+        candidates[[l]] <- tibble::tibble(
+          available_node = i, zone = j, is_connected = connected, avg_dist = zone_avg_dist
+        )
+      }
+    }
+
+    best_candidate <- do.call(dplyr::bind_rows, candidates) |>
+      dplyr::filter(is_connected == T) |>
+      dplyr::filter(avg_dist == min(avg_dist))
+
+    if (nrow(best_candidate) < 1) {
+      warning("there are no best candidate")
+      # TODO: handle no candidate is_connected
+    }
+
+    zones[[best_candidate$zone]] <- append(
+      zones[[best_candidate$zone]], best_candidate$available_node
+    )
+    available_nodes <- available_nodes[available_nodes != best_candidate$available_node]
   }
 
   return(
@@ -409,7 +416,7 @@ fix_connectivity <- function(inst, zones) {
 #' @export
 #'
 rb_clustering <- function(inst, L, k, num_routes, variances, info, dispute_obj = "most_frequent", shiny = F) {
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); dispute_obj = "highest_score"; shiny = F
+  # inst = test_instances$p7_chao; L = 59; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); dispute_obj = "most_frequent"; shiny = F; num_routes = 100; set.seed(3)
 
   # First we generate the initial routes
   message("Construct the initial rotues")
@@ -435,12 +442,43 @@ rb_clustering <- function(inst, L, k, num_routes, variances, info, dispute_obj =
   fc <- fix_connectivity(inst, zones); zones <- fc$zones; num_issues <- fc$num_issues
   message(paste0("number of issues fixed: ", num_issues))
 
+  # Check if zones are connected through the source
+  spans_source <- function(zone) {
+    sub_g <- igraph::induced_subgraph(inst$g, vids = zone[zone != 1])
+    igraph::is_connected(sub_g, mode = "weak")
+  }
+  pass <- do.call(c, lapply(zones, spans_source))
+
+  if (any(!pass)) {# handle the zone(s) that span the source
+    warning("A zone spans across the source, trying to re-zone one half of the spanning zone")
+    problems <- which(!pass)
+
+    if (length(problems) > 1) stop("More than one zone spans the source")
+
+    zone <- zones[[problems[1]]]
+
+    # Find out how many subclusters there are
+    sub_g <- igraph::induced_subgraph(inst$g, vids = zone[zone != 1])
+    decomp <- igraph::clusters(sub_g)
+
+    if (decomp$no != 2) stop("There are not two sub clusters in the zone that spans the source")
+
+    # dezone the nodes from the smallest sub cluster
+    available_nodes <- decomp$membership[
+      decomp$membership == which.min(decomp$csize)
+    ] |> names() |> as.integer()
+    zones[[problems[1]]] <- zones[[problems[1]]][!zones[[problems[1]]] %in% available_nodes]
+
+    fc <- fix_connectivity(inst, zones, available_nodes); zones <- fc$zones
+  }
+
   structure(
     list(
       "zones" = zones,
       "num_issues" = num_issues,
       "variances" = variances,
-      "info" = info
+      "info" = info,
+      "spanning_source" = any(!pass)
     ),
     class = "rb_clustering"
   )
@@ -459,8 +497,10 @@ plot.rb_clustering <- function(rb_clust, inst) {
   temp <- tibble::tibble(id = rb_clust$zones, agent_id = 1:length(rb_clust$zones)) |>
     tidyr::unnest(cols = id)
 
-  inst$points <- inst$points |>
-    dplyr::left_join(rb_clust$variances, by = c("id"))
+  if (!"score_variance" %in% colnames(inst$points)) {
+    inst$points <- inst$points |>
+      dplyr::left_join(rb_clust$variances, by = c("id"))
+  }
 
   same_zone_edges <- inst$edges |>
     dplyr::left_join(
