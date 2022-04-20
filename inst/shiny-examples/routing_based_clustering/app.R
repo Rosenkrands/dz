@@ -124,7 +124,7 @@ server <- function(input, output) {
     output$clustering_plot <- renderPlot({
       if (is.null(vals$clust)) {return()}
 
-      if (class(vals$clust) == "rb_clustering") {
+      if (class(vals$clust) %in% c("rb_clustering","initial_route")) {
         plot(vals$clust, inst = test_instances$p7_chao)
       } else {
         plot(vals$clust, delaunay = T)
