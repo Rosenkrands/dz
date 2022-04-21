@@ -66,7 +66,7 @@ instance <- function(path_to_file) {
 #' @return A ggplot object
 #' @export
 #'
-plot.instance <- function(inst, delaunay = FALSE) {
+plot.instance <- function(inst, delaunay = T) {
   # Instantiate the ggplot object
   p <- ggplot2::ggplot()
 
