@@ -19,5 +19,6 @@ initial_route(inst, L, variances, info)
 A route satisfying the range constraint, represented as an integer vector
 }
 \description{
-Generation of inital routes as part of the pre-mission clustering
+This function will sample the first node between all nodes in proportion to SDR, afterwards it will select the next node greedily maximizing SDR.
+It will update expected score based on whether anything unexpected comes up.
 }
