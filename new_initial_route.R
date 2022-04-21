@@ -74,7 +74,7 @@ get_SDR <- function(current_node, L_remaining, score) {
   r <- s/d * feasible; r[is.na(r) | !is.finite(r)] <- 0
 
   # return SDR for the feasible nodes
-  r[r > 0]
+  r[(r > 0) & names(r) != "1"]
 }
 
 # iterate this part
