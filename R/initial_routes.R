@@ -1,5 +1,8 @@
 #' Generation of inital routes as part of the pre-mission clustering
 #'
+#' This function will sample the first node between all nodes in proportion to SDR, afterwards it will select the next node greedily maximizing SDR.
+#' It will update expected score based on whether anything unexpected comes up.
+#'
 #' @param inst Instance object returned from the `instance` function
 #' @param L The range for each agent (homogenous agents are assumed)
 #' @param variances A set of variances returned from the `generate_variances` function
