@@ -23,6 +23,8 @@ prepare_instance <- function(inst, variances, info) {
     )|>
     dplyr::ungroup()
 
+  # TODO: update realized score to account for information from unexpected events...
+
   class(inst) <- "prepared_instance"
   return(inst)
 }
