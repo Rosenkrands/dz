@@ -22,6 +22,8 @@ starting_routes <- function(inst, zones, L) {
 
   all_points$zone[1] <- 0
 
+  # clustering_result <- clustering(inst = test_instances$p7_chao, k = 3, L = 100, eps = 0, cluster_method = "local_search", variances = generate_variances(inst), alpha = 0, info <- generate_information(inst, r = 100))
+
   same_zone_edges <- inst$edges |>
     dplyr::left_join(
       all_points |> dplyr::select(id, zone),
@@ -119,22 +121,37 @@ starting_routes <- function(inst, zones, L) {
       if (obj == 'SDR'){
         d <- vector(length = length(map$id))
         s <- vector(length = length(map$id))
+        s_path <- vector()
         SDR <- vector(length = length(map$id))
         for (i in 1:length(candidates)) {
           route_temp <- route
           route_temp <- append(route_temp, candidates[i], after = length(route_temp)-1)
-          d[i] <- dist(route[length(route)], candidates[i], g = g) +
-            dist(candidates[i], route[length(route)-1], g = g) -
-            as.vector(dist(route[length(route_temp)-2], route_temp[1], g = g))
-          s[i] <- map[candidates[i],]$score
+          # d[i] <- dist(route[length(route)], candidates[i], g = g) +
+          #   dist(candidates[i], route[length(route)-1], g = g) -
+          #   as.vector(dist(route[length(route_temp)-2], route_temp[1], g = g))
+          #
+          d[i] <- dist(route[length(route)-1], candidates[i], g = g) +
+            dist(candidates[i], 1, g = g) -
+            as.vector(dist(route[length(route_temp)-2], 1, g = g))
+          # Make vector of nodes in path to and from candidate, to base score of
+          sp1_nodes <- dist2(route[length(route)-1], candidates[i], g = g)
+          sp2_nodes <- dist2(candidates[i], 1, g = g)
+          s_path <- c(sp1_nodes, sp2_nodes[2:(length(sp2_nodes))])
+          s[i] <- sum(map$score[unique(s_path)])
+          # s[i] <- map[candidates[i],]$score
           SDR[i] <- s[i]/d[i]
           SDR[1] <- 0
         }
         New_last <- which.max(SDR)
+        sp1_nodes_g <- dist2(route[length(route)-1], New_last, g = g)
+        sp2_nodes_g <- dist2(New_last, 1, g = g)
+        s_path_g <- c(sp1_nodes_g, sp2_nodes_g[2:(length(sp2_nodes_g))])
+        # s_total <- sum(map$score[unique(s_path_g)]) + s_total
+        # map$score[unique(s_path_g)] <- 0
         all_short_path <- dist2(route[length(route)-1], New_last, g = g)
         for (node in (all_short_path[2:length(all_short_path)])) {
-          s_total <- s_total + map[node,]$score
-          map[node,]$score <- 0
+          s_total <- s_total + map$score[node]
+          map$score[node] <- 0
         }
       }
       if (obj == 'random'){
@@ -171,6 +188,92 @@ starting_routes <- function(inst, zones, L) {
       L_remaining <- L - route_length(route = route_temp, g = g)
     }
   }
+
+  # Use the result from solve_routing and update by adding until no more range in the same way as sovle_routing
+  # r <- solve_routing()
+  # r$route
+  # r$L_remaining
+  # L <- 150
+  # r$lookup
+
+  # improve_routing <- function(L_remaining = r$L_remaining, L = L, route = r$route, zone_id = 1){
+  #   # L_remaining = r$L_remaining; route = r$route; zone_id = 1
+  #   route <- match(route, r$lookup$id)
+  #
+  #   map = all_points |>
+  #     dplyr::filter((id == 1) | (zone == zone_id))
+  #
+  #   delsgs <- same_zone_edges |>
+  #     dplyr::filter(zone == zone_id) |>
+  #     tibble::as_tibble()
+  #
+  #   delsgs$dist <- sqrt((delsgs$x1 - delsgs$x2)^2 + (delsgs$y1 - delsgs$y2)^2)
+  #
+  #   # adapt to correct ids (by converting to local ids)
+  #   lookup <- map |> dplyr::mutate(local_id = dplyr::row_number()) |> dplyr::select(local_id, id)
+  #   map <- map |> dplyr::mutate(local_id = dplyr::row_number(), .before = everything())
+  #   delsgs <- delsgs |>
+  #     dplyr::inner_join(lookup, by = c("ind1" = "id")) |>
+  #     dplyr::select(-ind1, ind1 = local_id) |>
+  #     dplyr::inner_join(lookup, by = c("ind2" = "id")) |>
+  #     dplyr::select(-ind2, ind2 = local_id)
+  #
+  #   # create igraph object with local ids
+  #   g <- igraph::graph.data.frame(delsgs |>  dplyr::select(ind1, ind2, weight = dist), directed = FALSE, vertices = map |> dplyr::select(local_id, score))
+  #
+  #   candidates <- map$local_id[!(map$local_id) %in% route]
+  #   # last_in_current <- route[length(route)]
+  #   s_total <- 0
+  #
+  #   d <- list()
+  #   s <- list()
+  #   SDR <- list()
+  #   rl <- length(route)-1
+  #   while (L_remaining > 0) {
+  #     for (n in 1:rl) {
+  #       d[[n]] <- vector(length = length(candidates))
+  #       s[[n]] <- vector(length = length(candidates))
+  #       SDR[[n]] <- vector(length = length(candidates))
+  #       for (i in (1:(length(candidates)))) {
+  #         route_temp <- route
+  #         route_temp <- append(route_temp, candidates[i], after = route_temp[n])
+  #         d[[n]][i] <- dist(route_temp[n], candidates[i], g = g) +
+  #           dist(candidates[i], route_temp[n+2], g = g) -
+  #           dist(route_temp[n], route_temp[n+2], g = g)
+  #         s[[n]][i] <- map$score[candidates[i]]
+  #         SDR[[n]][i] <- (s[[n]][i])/(d[[n]][i])
+  #         if (d[[n]][i] > L_remaining){
+  #           SDR[[n]][i] <- 0
+  #         }
+  #       }
+  #     }
+  #     New_node <- vector(length = rl)
+  #     value <- vector(length = rl)
+  #     # New_node[n] <- which.max(SDR[[n]])
+  #     for (nr in 1:rl) {
+  #       New_node[nr] <- which.max(SDR[[nr]])
+  #       value[nr] <- max(SDR[[nr]])
+  #     }
+  #     if (max(value) == 0) {
+  #       route_global <- vector(length = length(route))
+  #       for (i in 1:length(route)){
+  #         route_global[i] <- lookup$id[route[i]]
+  #       }
+  #       L_remaining <- L - route_length(route = route, g = g)
+  #       output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+  #       return(output)
+  #     }
+  #     # Værdien i New_node er candidate id_local med højest SDR og indgangen er hvor i ruten det tilføjes efter
+  #     New_node_placement <- which.max(value)
+  #     ### Insert New_node in the right place
+  #     # TODO: Include shortest path to and from new node, not just the highest SDR node itself
+  #     route <- append(route, New_node[New_node_placement], after = New_node_placement)
+  #     # Update L_remaining
+  #     L_remaining <- L - route_length(route, g = g)
+  #     # Update score
+  #     map$score[New_node[New_node_placement]] <- 0
+  #   }
+  # }
 
   # we want to create a route for each zone
   routing_results <- tibble::tibble(agent_id = 1:length(zones))
@@ -276,11 +379,22 @@ plot.starting_routes <- function(sr, inst) {
 #' @export
 #'
 #' @examples
+
+r <- solve_routing()
+r$route
+r$L_remaining
+L <- 150
+r$lookup
+inst = test_instances$p7_chao
+
+update_routes(sr = r, L = 150, variances = generate_variances(inst = inst), info = info)
+
 update_routes <- function(sr, L, variances, info) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
+  # inst = test_instances$p7_chao; L = 150; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 
-  zones <- sr$zones
+  # zones <- sr$zones
+  zones <- sr$lookup$id
 
   # Join zones on instance
   map <- inst$points |>
@@ -337,7 +451,7 @@ update_routes <- function(sr, L, variances, info) {
 
   # update routes for each zone (multiple times)
   update_routing <- function(initial_route, zone_id, L, L_remaining) {
-    # initial_route = sr$initial_routes[[1]]; zone_id = 1; L = 100; L_remaining = sr$L_remaining[[1]]
+    # initial_route = sr$initial_routes[[1]]; zone_id = 1; L = 150; L_remaining = sr$L_remaining[[1]]
 
     delsgs <- same_zone_edges |>
       dplyr::filter(zone == zone_id) |>
@@ -348,7 +462,7 @@ update_routes <- function(sr, L, variances, info) {
     # Get vector of node ids in zone
     zone <- c(1,map |> dplyr::filter(zone == zone_id) |> dplyr::pull(id))
     # g <- igraph::induced_subgraph(test_instances$p7_chao$g, vids = zone)
-    g <- igraph::graph.data.frame(delsgs  |>  dplyr::select(ind1, ind2, weight = dist), directed = FALSE, vertices = map  |>  dplyr::select(id, score))
+    g <- igraph::graph.data.frame(delsgs |> dplyr::select(ind1, ind2, weight = dist), directed = FALSE, vertices = map  |>  dplyr::select(id, score))
     dst <- igraph::distances(g)
     # L <- 150
     # initial_route <- solve_routing(L = L)
