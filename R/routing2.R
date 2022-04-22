@@ -86,8 +86,8 @@ starting_routes <- function(inst, zones, L) {
   }
 
   # solve routing for each zone to get initial route
-  solve_routing <- function(obj = 'SDR', L = 150, zone_id = 1){
-    # obj = 'SDR'; L = 150; zone_id = 1
+  solve_routing <- function(obj = 'SDR', L = 100, zone_id = 3){
+    # obj = 'SDR'; L = 100; zone_id = 3
     L_remaining <- L
     map = all_points |>
       dplyr::filter((id == 1) | (zone == zone_id))
@@ -141,6 +141,8 @@ starting_routes <- function(inst, zones, L) {
           # s[i] <- map[candidates[i],]$score
           SDR[i] <- s[i]/d[i]
           SDR[1] <- 0
+          SDR[is.na(SDR)] <- 0
+          SDR[!is.finite(SDR)] <- 0
         }
         New_last <- which.max(SDR)
         sp1_nodes_g <- dist2(route[length(route)-1], New_last, g = g)
@@ -164,7 +166,9 @@ starting_routes <- function(inst, zones, L) {
       while ((dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g)) > L_remaining){ # if there is not enough range to visit new last check the next one
         SDR[New_last] <- 0
         New_last <- which.max(SDR)
-        if (SDR[New_last] == 0) {# No sdr candidates can be reaced, add route back to base
+        print(New_last)
+        print(SDR[New_last])
+        if (SDR[New_last] == 0) {# No SDR candidates can be reached, add route back to base
           all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
           route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
           route_global <- vector(length = length(route))
@@ -174,6 +178,7 @@ starting_routes <- function(inst, zones, L) {
           L_remaining <- L - route_length(route = route, g = g)
           # Function to plot path using information in route object
           output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+          print(route)
           return(output)
         }
       }
@@ -186,6 +191,31 @@ starting_routes <- function(inst, zones, L) {
       #   route_global[i] <- lookup$id[route_temp[i]]
       # }
       L_remaining <- L - route_length(route = route_temp, g = g)
+      while (L_remaining < 0) {
+        # route[-(length(route)-1)]
+        route_temp <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
+        L_remaining <- L - route_length(route = route_temp, g = g)
+        SDR <- rep(0, length(SDR))
+        print(L_remaining)
+      }
+      # print(route)
+      # if (L_remaining < 50) {
+        # route_global <- vector(length = length(route))
+        # for (i in 1:length(route)){
+        #   route_global[i] <- lookup$id[route[i]]
+        # }
+      #   output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+      #   return(output)
+      # }
+      # print(SDR)
+      if (max(SDR) == 0){
+        route_global <- vector(length = length(route))
+        for (i in 1:length(route)){
+          route_global[i] <- lookup$id[route[i]]
+        }
+        output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+        return(output)
+      }
     }
   }
 
@@ -380,18 +410,25 @@ plot.starting_routes <- function(sr, inst) {
 #'
 #' @examples
 
-r <- solve_routing()
-r$route
-r$L_remaining
-L <- 150
-r$lookup
-inst = test_instances$p7_chao
+inst = test_instances$p7_chao; L = 80; k = 3
+info <- generate_information(inst = inst, r = 20)
+generated_variances <- generate_variances(inst = inst)
+clust_obj <- rb_clustering(inst = inst, num_route = 80, info = info, variances = generated_variances, k = 3, L = 80)
 
-update_routes(sr = r, L = 150, variances = generate_variances(inst = inst), info = info)
+sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 80)
+
+# r <- solve_routing()
+# r$route
+# r$L_remaining
+# L <- 150
+# r$lookup
+# inst = test_instances$p7_chao
+#
+ur <- update_routes(sr = sr, L = 80, variances = generated_variances, info = info)
 
 update_routes <- function(sr, L, variances, info) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; L = 150; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
+  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 
   # zones <- sr$zones
   zones <- sr$lookup$id
@@ -559,6 +596,7 @@ update_routes <- function(sr, L, variances, info) {
         sp_cand_2[[candidate]] <- dist2(candidate, remaining_nodes[2], g = g)
         for (sp_node in sp_cand_2[[candidate]]) {
           # handle the case of candidate being equal to remaining_nodes[2]
+          # realized_score <- map$realized_score[unique(c(sp_cand_1[[candidate]], sp_cand_2[[candidate]]))]
           realized_score <- map$realized_score[sp_node]
           if (length(realized_score) == 0) {realized_score <- map$realized_score[candidate]}
           s_cand_tot[candidate] <- s_cand_tot[candidate] + realized_score
