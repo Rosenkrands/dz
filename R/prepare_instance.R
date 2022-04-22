@@ -62,12 +62,12 @@ plot.prepared_instance <- function(p_inst) {
     # Draw the intermediate nodes
     ggplot2::geom_point(
       data = p_inst$points |> dplyr::filter(point_type == "intermediate"),
-      ggplot2::aes(x, y, size = score, color = score, stroke = unexpected, alpha = score_variance)
+      ggplot2::aes(x, y, size = score, color = score, alpha = score_variance)
     ) +
     # Draw a cross on intermediate nodes that have an unexpected observation
     ggplot2::geom_point(
       data = p_inst$points |> dplyr::filter(point_type == "intermediate", unexpected == T),
-      ggplot2::aes(x, y), shape = 4
+      ggplot2::aes(x = x, y = y), shape = 4
     ) +
     # Draw the terminal node
     ggplot2::geom_point(
