@@ -38,4 +38,5 @@ starting_route_list <- lapply(zone_list, function(x) starting_routes(inst, x, L)
 updated_route_list <- lapply(starting_route_list, function(x) update_routes(x, L, variances, info))
 
 # compare results
+lapply(starting_route_list, function(x) sum(do.call(c, x$s_total)))
 lapply(updated_route_list, function(x) sum(do.call(c, x$s_total)))
