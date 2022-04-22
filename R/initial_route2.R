@@ -128,6 +128,53 @@ initial_route2 <- function(p_inst, L, info) {
       "expected_score" = sum(p_inst$points$score[route]),
       "L" = L - L_remaining
     ),
-    class = "initial_route"
+    class = "initial_route2"
   )
+}
+
+#' Plot the initial route on the instance
+#'
+#' @param init_route A list returned by the `initial_route` function
+#' @param inst
+#'
+#' @return
+#' @export
+#'
+plot.initial_route2 <- function(init_route, p_inst) {
+  # For testing purposes:
+  # inst = test_instances$p7_chao; L = 100; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20)
+
+  # Generate route segments based on the route
+  route_segments <- tibble::tibble(route = init_route$route) |>
+    dplyr::mutate(id_start = dplyr::lag(route), id_end = route) |>
+    dplyr::filter(!is.na(id_start)) |>
+    dplyr::select(-route) |>
+    dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
+                      by = c("id_start" = "id")) |>
+    dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
+                      by = c("id_end" = "id"), suffix = c("","end")) |>
+    dplyr::group_by(x,y,xend,yend)
+
+  ggplot2::ggplot() +
+    ggplot2::geom_point(
+      data = p_inst$points |> dplyr::filter(point_type == "intermediate"),
+      # ggplot2::aes(x, y, size = score, color = score, shape = point_type)
+      ggplot2::aes(x, y, shape = point_type)
+    ) +
+    ggplot2::geom_segment(
+      data = p_inst$edges,
+      ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+      color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+    ) +
+    ggplot2::geom_segment(
+      data = route_segments,
+      ggplot2::aes(x=x, y=y, xend=xend, yend=yend)
+    ) +
+    ggplot2::geom_point(
+      data = p_inst$points |> dplyr::filter(point_type == "terminal"),
+      ggplot2::aes(x, y), color = "red", shape = 17
+    ) +
+    ggplot2::ggtitle(paste0("Instance: ", p_inst$name)) +
+    ggplot2::theme_bw() +
+    ggplot2::guides(shape = "none", size = "none")
 }

@@ -12,6 +12,7 @@
 #' @export
 #'
 initial_route <- function(inst, L, variances, info) {
+  # TODO: adapt to use the prepared instance
   # For testing purposes:
   # inst = test_instances$p7_chao; L = 100; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20)
   L_remaining <- L
@@ -418,18 +419,14 @@ fix_connectivity <- function(inst, zones, available_nodes = integer()) {
 #' @return
 #' @export
 #'
-rb_clustering <- function(inst, L, k, num_routes, variances, info, dispute_obj = "most_frequent", shiny = F) {
-  # inst = test_instances$p7_chao; L = 59; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); dispute_obj = "most_frequent"; shiny = F; num_routes = 100; set.seed(3)
+rb_clustering <- function(p_inst, L, k, num_routes, info, dispute_obj = "most_frequent", shiny = F) {
+  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); p_inst <- prepare_instance(inst, variances, info); dispute_obj = "most_frequent"; shiny = F; num_routes = 100; set.seed(3)
 
   # First we generate the initial routes
   message("Construct the initial rotues")
   suppressMessages(
-    init_routes <- 1:num_routes |> as.list() |> pbapply::pblapply(function(x) {if (shiny) shiny::incProgress(amount = 0.01); initial_route(inst, L, variances, info)})
+    init_routes <- 1:num_routes |> as.list() |> pbapply::pblapply(function(x) {if (shiny) shiny::incProgress(amount = 1/num_routes); initial_route2(p_inst, L, info)})
   )
-
-  # Then we add the variance data to the instance for later use
-  inst$points <- inst$points |>
-    dplyr::left_join(variances, by = c("id"))
 
   # Then we perform the route clustering
   message("Performing the clustering")
@@ -479,7 +476,7 @@ rb_clustering <- function(inst, L, k, num_routes, variances, info, dispute_obj =
     list(
       "zones" = zones,
       "num_issues" = num_issues,
-      "variances" = variances,
+      "p_inst" = p_inst,
       "info" = info,
       "spanning_source" = any(!pass)
     ),
@@ -495,17 +492,14 @@ rb_clustering <- function(inst, L, k, num_routes, variances, info, dispute_obj =
 #' @return
 #' @export
 #'
-plot.rb_clustering <- function(rb_clust, inst) {
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info)
+plot.rb_clustering <- function(rb_clust) {
+  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, info)
+  p_inst <- rb_clust$p_inst
+
   temp <- tibble::tibble(id = rb_clust$zones, agent_id = 1:length(rb_clust$zones)) |>
     tidyr::unnest(cols = id)
 
-  if (!"score_variance" %in% colnames(inst$points)) {
-    inst$points <- inst$points |>
-      dplyr::left_join(rb_clust$variances, by = c("id"))
-  }
-
-  same_zone_edges <- inst$edges |>
+  same_zone_edges <- p_inst$edges |>
     dplyr::left_join(
       temp |> dplyr::rename(zone = agent_id),
       by = c("ind1" = "id")
@@ -525,17 +519,17 @@ plot.rb_clustering <- function(rb_clust, inst) {
       color = ggplot2::alpha("black", 0.3), linetype = "dashed"
     ) +
     ggplot2::geom_point(
-      data = inst$points |> dplyr::filter(point_type == "terminal"),
+      data = p_inst$points |> dplyr::filter(point_type == "terminal"),
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     ggplot2::geom_point(
-      data = inst$points |>
+      data = p_inst$points |>
         dplyr::filter(point_type == "intermediate") |>
         dplyr::left_join(temp, by = c("id")),
       ggplot2::aes(x, y, color = as.character(agent_id), size = score, alpha = score_variance)
     ) +
     # ggplot2::scale_color_manual(values = c("black", scales::hue_pal()(k))) +
-    ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
+    ggplot2::ggtitle(paste0("Instance: ", p_inst$name)) +
     ggplot2::theme_bw() +
     ggplot2::guides(
       shape = "none",

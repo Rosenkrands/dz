@@ -85,11 +85,10 @@ server <- function(input, output) {
         shinyjs::html("text", "")
         withProgress(
           vals$clust <- rb_clustering(
-            inst = test_instances$p7_chao,
+            p_inst = prepare_instance(test_instances$p7_chao, variances(), info()),
             L = input$L,
             k = input$k,
             num_routes = input$num_routes,
-            variances = variances(),
             info = info(),
             dispute_obj = input$dispute_obj,
             shiny = T
@@ -125,7 +124,7 @@ server <- function(input, output) {
       if (is.null(vals$clust)) {return()}
 
       if (class(vals$clust) %in% c("rb_clustering","initial_route")) {
-        plot(vals$clust, inst = test_instances$p7_chao)
+        plot(vals$clust)
       } else {
         plot(vals$clust, delaunay = T)
       }
