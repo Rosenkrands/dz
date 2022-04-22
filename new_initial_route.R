@@ -80,7 +80,6 @@ get_SDR <- function(current_node, L_remaining, score) {
 # iterate this part
 
 # Decide on the next node
-# TODO: return to home if there are no feasible node returned from get_SDR
 sdr <- get_SDR(current_node, L_remaining, score)
 candidates <- sdr |> names() |> as.integer()
 
