@@ -46,6 +46,7 @@ get_SDR <- function(current_node, L_remaining, score, graph = g, dst = dst) {
 
   # can we get to a node and back to source
   feasible <- d + dst[,1] <= L_remaining # TODO: we should maybe adjust L_remaining here to discourage paths that are close to L_remaining
+  # Should maybe be proportional to remaining range
 
   # set the infeasible nodes to 0 including the current node
   r <- s/d * feasible; r[is.na(r) | !is.finite(r)] <- 0
@@ -77,7 +78,11 @@ ui <- fluidPage(
                       min = 0, max = 500, value = c(10, 100)),
 
           actionButton("btn","Show instance"),
-          br(), br(), textOutput("text")
+          br(), br(),
+          htmlOutput("realized_score"),
+          tags$head(tags$style("#realized_score{font-size: 16px;}")),
+          htmlOutput("L_remaining"),
+          tags$head(tags$style("#L_remaining{font-size: 16px;}")),
         ),
 
         mainPanel(
@@ -99,7 +104,7 @@ server <- function(input, output) {
       g = NULL,
       dst = NULL,
       route = NULL,
-      L_remaining = NULL,
+      L_remaining = 0,
       route_concluded = NULL,
       current_node = NULL,
       candidates = NULL,
@@ -241,6 +246,20 @@ server <- function(input, output) {
     output$clustering_plot <- renderPlot({
       vals$p
     }, res = 110, width = 1000, height = 800)
+
+    output$realized_score <- renderUI({
+      HTML(paste0(
+        "<b>Total realized score:</b> ",
+        round(sum(vals$realized_score[unique(vals$route)]),1)
+      ))
+    })
+
+    output$L_remaining <- renderUI({
+      HTML(paste0(
+        "<b>Range remaining:</b> ",
+        round(vals$L_remaining,1)
+      ))
+    })
 }
 
 shinyApp(ui = ui, server = server)

@@ -1,5 +1,5 @@
 library(dz)
-set.seed(2)
+set.seed(1)
 
 # Setting parameters
 inst <- test_instances$p7_chao
@@ -134,6 +134,7 @@ for (j in path_to_next) { # we need to consider all nodes in the shortest path
     related_nodes <- which(info[j,] != 0) # find the nodes that are related
     for (k in related_nodes) { # update score
       # TODO: What if the score have already been gather do we want to add new score or ignore points that are already visited?
+      # Only update the scores for unvisited points
       score[k] <- score[k] + info[j,k]
     }
     unexpected[j] <- F
