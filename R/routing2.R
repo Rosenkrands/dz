@@ -86,7 +86,7 @@ starting_routes <- function(inst, zones, L) {
   }
 
   # solve routing for each zone to get initial route
-  solve_routing <- function(obj = 'SDR', L = 100, zone_id = 3){
+  solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
     # obj = 'SDR'; L = 100; zone_id = 3
     L_remaining <- L
     map = all_points |>
@@ -171,6 +171,12 @@ starting_routes <- function(inst, zones, L) {
         if (SDR[New_last] == 0) {# No SDR candidates can be reached, add route back to base
           all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
           route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
+          ### Remove duplicate e.g. 1 56 ... 30 1 30 1
+          for (i in 1:(length(route)-3)) {
+            if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
+              route <- route[-i]; route <- route[-i]
+            }
+          }
           route_global <- vector(length = length(route))
           for (i in 1:length(route)){
             route_global[i] <- lookup$id[route[i]]
@@ -196,7 +202,6 @@ starting_routes <- function(inst, zones, L) {
         route_temp <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
         L_remaining <- L - route_length(route = route_temp, g = g)
         SDR <- rep(0, length(SDR))
-        print(L_remaining)
       }
       # print(route)
       # if (L_remaining < 50) {
@@ -209,9 +214,35 @@ starting_routes <- function(inst, zones, L) {
       # }
       # print(SDR)
       if (max(SDR) == 0){
+        # If last before source is not directly connected to source
+        if (length((dist2(route[(length(route)-1)], route[length(route)], g = g))) > 2) {
+          # Connect them if L_remaining allows it, otherwise remove some of the route
+          if (route_length(route = route, g = g) <= L){
+            # Add shortest path to source to "route"
+            sp_last <- dist2(route[(length(route)-1)], route[length(route)], g = g)
+            route <- append(route, sp_last[2:(length(sp_last)-1)], after = (length(route)-1))
+            # Make sure we return after this
+            # SDR <- rep(0, length(SDR))
+          } else {
+            while (route_length(route = route, g = g) > L) {
+              # Remove last in route
+              route <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
+              L_remaining <- L - route_length(route = route_temp, g = g)
+            }
+            sp_last <- dist2(route[(length(route)-1)], route[length(route)], g = g)
+            route <- append(route, sp_last[2:(length(sp_last)-1)], after = (length(route)-1))
+            # SDR <- rep(0, length(SDR))
+          }
+        }
         route_global <- vector(length = length(route))
         for (i in 1:length(route)){
           route_global[i] <- lookup$id[route[i]]
+        }
+        ### Remove duplicate e.g. 1 56 ... 30 1 30 1
+        for (i in (length(route_global)-3)) {
+          if (route_global[i] == route_global[i+2] & route_global[i+1] == route_global[i+3]) {
+            route_global <- route_global[-i]; route_global <- route_global[-i]
+          }
         }
         output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
         return(output)
@@ -220,90 +251,110 @@ starting_routes <- function(inst, zones, L) {
   }
 
   # Use the result from solve_routing and update by adding until no more range in the same way as sovle_routing
-  # r <- solve_routing()
-  # r$route
-  # r$L_remaining
-  # L <- 150
-  # r$lookup
+  r <- solve_routing(zone_id =  1)
+  r$route
+  r$L_remaining
+  L <- 100
 
-  # improve_routing <- function(L_remaining = r$L_remaining, L = L, route = r$route, zone_id = 1){
-  #   # L_remaining = r$L_remaining; route = r$route; zone_id = 1
-  #   route <- match(route, r$lookup$id)
-  #
-  #   map = all_points |>
-  #     dplyr::filter((id == 1) | (zone == zone_id))
-  #
-  #   delsgs <- same_zone_edges |>
-  #     dplyr::filter(zone == zone_id) |>
-  #     tibble::as_tibble()
-  #
-  #   delsgs$dist <- sqrt((delsgs$x1 - delsgs$x2)^2 + (delsgs$y1 - delsgs$y2)^2)
-  #
-  #   # adapt to correct ids (by converting to local ids)
-  #   lookup <- map |> dplyr::mutate(local_id = dplyr::row_number()) |> dplyr::select(local_id, id)
-  #   map <- map |> dplyr::mutate(local_id = dplyr::row_number(), .before = everything())
-  #   delsgs <- delsgs |>
-  #     dplyr::inner_join(lookup, by = c("ind1" = "id")) |>
-  #     dplyr::select(-ind1, ind1 = local_id) |>
-  #     dplyr::inner_join(lookup, by = c("ind2" = "id")) |>
-  #     dplyr::select(-ind2, ind2 = local_id)
-  #
-  #   # create igraph object with local ids
-  #   g <- igraph::graph.data.frame(delsgs |>  dplyr::select(ind1, ind2, weight = dist), directed = FALSE, vertices = map |> dplyr::select(local_id, score))
-  #
-  #   candidates <- map$local_id[!(map$local_id) %in% route]
-  #   # last_in_current <- route[length(route)]
-  #   s_total <- 0
-  #
-  #   d <- list()
-  #   s <- list()
-  #   SDR <- list()
-  #   rl <- length(route)-1
-  #   while (L_remaining > 0) {
-  #     for (n in 1:rl) {
-  #       d[[n]] <- vector(length = length(candidates))
-  #       s[[n]] <- vector(length = length(candidates))
-  #       SDR[[n]] <- vector(length = length(candidates))
-  #       for (i in (1:(length(candidates)))) {
-  #         route_temp <- route
-  #         route_temp <- append(route_temp, candidates[i], after = route_temp[n])
-  #         d[[n]][i] <- dist(route_temp[n], candidates[i], g = g) +
-  #           dist(candidates[i], route_temp[n+2], g = g) -
-  #           dist(route_temp[n], route_temp[n+2], g = g)
-  #         s[[n]][i] <- map$score[candidates[i]]
-  #         SDR[[n]][i] <- (s[[n]][i])/(d[[n]][i])
-  #         if (d[[n]][i] > L_remaining){
-  #           SDR[[n]][i] <- 0
-  #         }
-  #       }
-  #     }
-  #     New_node <- vector(length = rl)
-  #     value <- vector(length = rl)
-  #     # New_node[n] <- which.max(SDR[[n]])
-  #     for (nr in 1:rl) {
-  #       New_node[nr] <- which.max(SDR[[nr]])
-  #       value[nr] <- max(SDR[[nr]])
-  #     }
-  #     if (max(value) == 0) {
-  #       route_global <- vector(length = length(route))
-  #       for (i in 1:length(route)){
-  #         route_global[i] <- lookup$id[route[i]]
-  #       }
-  #       L_remaining <- L - route_length(route = route, g = g)
-  #       output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
-  #       return(output)
-  #     }
-  #     # Værdien i New_node er candidate id_local med højest SDR og indgangen er hvor i ruten det tilføjes efter
-  #     New_node_placement <- which.max(value)
-  #     ### Insert New_node in the right place
-  #     # TODO: Include shortest path to and from new node, not just the highest SDR node itself
-  #     route <- append(route, New_node[New_node_placement], after = New_node_placement)
-  #     # Update L_remaining
-  #     L_remaining <- L - route_length(route, g = g)
-  #     # Update score
-  #     map$score[New_node[New_node_placement]] <- 0
-  #   }
-  # }
+  improve_routing <- function(L_remaining = r$L_remaining, L = L, route = r$route, zone_id = 1){
+    # L_remaining = r$L_remaining; route = r$route; zone_id = 1
+    # route <- lookup$local_id[match(lookup$local_id, route)]
+    map = all_points |>
+      dplyr::filter((id == 1) | (zone == zone_id))
+
+    delsgs <- same_zone_edges |>
+      dplyr::filter(zone == zone_id) |>
+      tibble::as_tibble()
+
+    delsgs$dist <- sqrt((delsgs$x1 - delsgs$x2)^2 + (delsgs$y1 - delsgs$y2)^2)
+
+    # adapt to correct ids (by converting to local ids)
+    lookup <- map |> dplyr::mutate(local_id = dplyr::row_number()) |> dplyr::select(local_id, id)
+    map <- map |> dplyr::mutate(local_id = dplyr::row_number(), .before = everything())
+    delsgs <- delsgs |>
+      dplyr::inner_join(lookup, by = c("ind1" = "id")) |>
+      dplyr::select(-ind1, ind1 = local_id) |>
+      dplyr::inner_join(lookup, by = c("ind2" = "id")) |>
+      dplyr::select(-ind2, ind2 = local_id)
+
+    # create igraph object with local ids
+    g <- igraph::graph.data.frame(delsgs |>  dplyr::select(ind1, ind2, weight = dist), directed = FALSE, vertices = map |> dplyr::select(local_id, score))
+
+    route <- sapply(route, function(x) lookup$local_id[lookup$id == x])
+
+    map$score[route] <- 0
+
+    candidates <- map$local_id[!(map$local_id) %in% route]
+    # last_in_current <- route[length(route)]
+    s_total <- 0
+
+    d <- list()
+    s <- list()
+    SDR <- list()
+    rl <- length(route)-1
+    while (L_remaining > 0) {
+      for (n in 1:rl) {
+        d[[n]] <- vector(length = length(candidates))
+        s[[n]] <- vector(length = length(candidates))
+        SDR[[n]] <- vector(length = length(candidates))
+        for (i in (1:(length(candidates)))) {
+          route_temp <- route
+          route_temp <- append(route_temp, candidates[i], after = n)
+          d[[n]][i] <- dist(route_temp[n], candidates[i], g = g) +
+            dist(candidates[i], route_temp[n+2], g = g) -
+            dist(route_temp[n], route_temp[n+2], g = g)
+          # Uses SDR for all nodes is the shortest paths
+          nodes_visited <- unique(c(dist2(route[n], candidates[i], g = g), dist2(candidates[i], route[n+1], g = g)))
+          s[[n]][i] <- sum(map$score[nodes_visited])
+          SDR[[n]][i] <- (s[[n]][i])/(d[[n]][i])
+          SDR[[n]][i][!is.finite(SDR[[n]][i])] <- 0
+          if (d[[n]][i] > L_remaining){
+            SDR[[n]][i] <- 0
+          }
+        }
+      }
+      New_node <- vector(length = rl)
+      value <- vector(length = rl)
+      # New_node[n] <- which.max(SDR[[n]])
+      for (nr in 1:rl) {
+        New_node[nr] <- which.max(SDR[[nr]])
+        value[nr] <- max(SDR[[nr]])
+      }
+      if (max(value) == 0) {
+        route_global <- vector(length = length(route))
+        for (i in 1:length(route)){
+          route_global[i] <- lookup$id[route[i]]
+        }
+        L_remaining <- L - route_length(route = route, g = g)
+        output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+        return(output)
+      }
+      # Værdien i New_node er candidate id_local med højest SDR og indgangen er hvor i ruten det tilføjes efter
+      New_node_placement <- which.max(value)
+      ### Insert New_node in the right place
+      # Includes shortest path to and from new node, not just the highest SDR node itself
+      short_path_to <- dist2(route[New_node_placement], candidates[New_node[New_node_placement]], g = g)
+      short_path_back <- dist2(candidates[New_node[New_node_placement]], route[(New_node_placement+1)], g = g)
+      route <- append(route, short_path_to[2:length(short_path_to)], after = New_node_placement)
+      route <- append(route, short_path_back[2:(length(short_path_back)-1)], after = (New_node_placement + length(short_path_to) - 1))
+      # route <- append(route, New_node[New_node_placement], after = New_node_placement)
+      # Update L_remaining
+      L_remaining <- L - route_length(route, g = g)
+      # Update score
+      # map$score[New_node[New_node_placement]] <- 0
+      map$score[unique(c(short_path_to, short_path_back))] <- 0
+      ### Remove duplicate e.g. 1 56 ... 30 1 30 1
+      for (i in 1:(length(route)-4)) {
+        if ((route[i] == route[i+2]) && (route[i+1] == route[i+3])) {
+          route <- route[-i]; route <- route[-i]
+        }
+      }
+    }
+    return(route)
+  }
+
+  # Testing
+  imr <- improve_routing()
 
   # we want to create a route for each zone
   routing_results <- tibble::tibble(agent_id = 1:length(zones))
@@ -398,6 +449,14 @@ plot.starting_routes <- function(sr, inst) {
     )
 }
 
+# inst = test_instances$p7_chao; L = 80; k = 3
+# info <- generate_information(inst = inst, r = 20)
+# generated_variances <- generate_variances(inst = inst)
+# clust_obj <- rb_clustering(inst = inst, num_route = 80, info = info, variances = generated_variances, k = 3, L = 80)
+#
+# sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 80)
+
+
 #' Update the starting routes based on realized scores
 #'
 #' @param sr
@@ -409,22 +468,6 @@ plot.starting_routes <- function(sr, inst) {
 #' @export
 #'
 #' @examples
-
-inst = test_instances$p7_chao; L = 80; k = 3
-info <- generate_information(inst = inst, r = 20)
-generated_variances <- generate_variances(inst = inst)
-clust_obj <- rb_clustering(inst = inst, num_route = 80, info = info, variances = generated_variances, k = 3, L = 80)
-
-sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 80)
-
-# r <- solve_routing()
-# r$route
-# r$L_remaining
-# L <- 150
-# r$lookup
-# inst = test_instances$p7_chao
-#
-ur <- update_routes(sr = sr, L = 80, variances = generated_variances, info = info)
 
 update_routes <- function(sr, L, variances, info) {
   # For testing purposes:
@@ -703,6 +746,9 @@ update_routes <- function(sr, L, variances, info) {
     class = "updated_routes"
   )
 }
+
+ur <- update_routes(sr = sr, L = 80, variances = generated_variances, info = info)
+
 
 # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 #
