@@ -199,24 +199,56 @@ plot.initial_route <- function(init_route, inst) {
 #'
 #' @param init_routes a list of initial routes obtained from the `initial_route` function
 #' @param k the number of agents
+#' @param measure what dissimilarity measure to use, can be either "element-based" or "position-based". Defaults to "position-based".
 #'
 #' @return a list containing the `hclust` object and a vector of the clusters
 #' @export
 #'
-route_clustering <- function(init_routes, k) {
-  compute_dissimilarity <- function(i,j) {
-    nodes_i <- unique(init_routes[[i]]$route)
-    nodes_j <- unique(init_routes[[j]]$route)
-    difference <- setdiff(nodes_i, nodes_j)
-    return(length(difference))
-  }
-
-  n <- length(init_routes)
-  dissimilarity <- matrix(nrow = n, ncol = n)
-  for (i in 1:n) {
-    for (j in 1:n) {
-      dissimilarity[i,j] <- compute_dissimilarity(i,j)
+route_clustering <- function(init_routes, k, measure = "position-based") {
+  if (measure == "element-based") {
+    compute_dissimilarity <- function(i,j) {
+      nodes_i <- unique(init_routes[[i]]$route)
+      nodes_j <- unique(init_routes[[j]]$route)
+      difference <- setdiff(nodes_i, nodes_j)
+      return(length(difference))
     }
+
+    n <- length(init_routes)
+    dissimilarity <- matrix(nrow = n, ncol = n)
+    for (i in 1:n) {
+      for (j in 1:n) {
+        dissimilarity[i,j] <- compute_dissimilarity(i,j)
+      }
+    }
+  } else if (measure == "position-based") {
+    position_dissimilarity <- function(ids) {
+      # Determine the longest route
+      routes <- list(init_routes[[ids[1]]]$route, init_routes[[ids[2]]]$route)
+      longest_route <- do.call(c, lapply(routes, length)) |> which.max()
+
+      sapply(
+        routes[[longest_route]],
+        function(node_id) {
+          p_inst$dst[node_id, unique(routes[-longest_route][[1]])] |> min()
+        }
+      ) |> mean()
+    }
+
+    # find all combinations of routes and compute dissimilarity
+    combinations <- utils::combn(1:num_routes, 2, simplify = F)
+    dis <- pbapply::pblapply(combinations, position_dissimilarity)
+
+    # create matrix to hold results
+    dissimilarity <- matrix(data = 0, nrow = num_routes, ncol = num_routes)
+
+    # take dissimilarity values from the list and insert into the matrix
+    lapply(seq_along(combinations), function(i) {
+      ids <- combinations[[i]]
+      dissimilarity[ids[1], ids[2]] <<- dis[[i]]
+    })
+
+    # mirror the upper part of the matrix into the lower part
+    dissimilarity <- dissimilarity + t(dissimilarity)
   }
 
   hc <- stats::hclust(as.dist(dissimilarity))
@@ -468,6 +500,8 @@ rb_clustering <- function(p_inst, L, k, num_routes, info, dispute_obj = "most_fr
       decomp$membership == which.min(decomp$csize)
     ] |> names() |> as.integer()
     zones[[problems[1]]] <- zones[[problems[1]]][!zones[[problems[1]]] %in% available_nodes]
+
+    message(paste0("number of nodes rezoned: ", min(decomp$csize)))
 
     fc <- fix_connectivity(inst, zones, available_nodes); zones <- fc$zones
   }
