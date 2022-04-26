@@ -23,7 +23,16 @@ prepare_instance <- function(inst, variances, info) {
     )|>
     dplyr::ungroup()
 
-  # TODO: update realized score to account for information from unexpected events...
+  # Update realized score to account for information from unexpected events
+  for (i in inst$points$id) { # we need to consider all nodes
+    if (inst$points$unexpected[i]) {
+      related_nodes <- which(info[i,] != 0) # find the nodes that are related
+      for (j in related_nodes) { # update score
+        # Only update the scores for unvisited points
+        inst$points$realized_score[j] <- inst$points$realized_score[j] + info[i,j]
+      }
+    }
+  }
 
   class(inst) <- "prepared_instance"
   return(inst)
