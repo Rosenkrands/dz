@@ -1,5 +1,5 @@
 library(dz)
-set.seed(4)
+set.seed(7)
 
 # Setting parameters
 inst <- test_instances$p7_chao
@@ -62,7 +62,7 @@ routes <- list(route1$route, route2$route)
 longest_route <- do.call(c, lapply(routes, length)) |> which.max()
 
 distance_to_closest <- function(node_id, other_route) {
-   # node_id <- routes[[longest_route]][2]; other_route <- routes[-longest_route][[1]]
+  # node_id <- routes[[longest_route]][2]; other_route <- routes[-longest_route][[1]]
   sub_dst <- p_inst$dst[node_id, unique(other_route)]
 
   closest_node_id <- sub_dst |> which.min() |> names() |> as.integer()
@@ -80,33 +80,31 @@ rslt <- do.call(
 )
 
 arrow_length = 5
-for (i in length(routes[[longest_route]])) {
-  i = 1
-  plot_data <- rslt[i, ] |>
-    dplyr::left_join(
-      p_inst$points |> dplyr::select(id,x,y),
-      by = c("node_id" = "id")
-    ) |>
-    dplyr::left_join(
-      p_inst$points |> dplyr::select(id,x,y),
-      by = c("closest_node_id" = "id"),
-      suffix = c("", "_closest")
-    ) |>
-    dplyr::mutate(xend = x + arrow_length, yend = y + arrow_length,
-                  x_closest_end = x_closest - arrow_length, y_closest_end = y_closest + arrow_length)
+i = 1
 
-  print(p +
-    ggplot2::geom_segment(
-      data = plot_data,
-      ggplot2::aes(x=x,y=y,xend=xend,yend=yend),
-      arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"), ends = "first")
-    ) +
-    ggplot2::geom_segment(
-      data = plot_data,
-      ggplot2::aes(x=x_closest,y=y_closest,xend=x_closest_end,yend=y_closest_end),
-      arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"), ends = "first")
-    ))
-  i = i + 1
-  invisible(readline(prompt="Press [enter] to continue"))
-}
+plot_data <- rslt[i, ] |>
+  dplyr::left_join(
+    p_inst$points |> dplyr::select(id,x,y),
+    by = c("node_id" = "id")
+  ) |>
+  dplyr::left_join(
+    p_inst$points |> dplyr::select(id,x,y),
+    by = c("closest_node_id" = "id"),
+    suffix = c("", "_closest")
+  ) |>
+  dplyr::mutate(xend = x + arrow_length, yend = y + arrow_length,
+                x_closest_end = x_closest - arrow_length, y_closest_end = y_closest + arrow_length)
+
+print(p +
+  ggplot2::geom_segment(
+    data = plot_data,
+    ggplot2::aes(x=x,y=y,xend=xend,yend=yend),
+    arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"), ends = "first")
+  ) +
+  ggplot2::geom_segment(
+    data = plot_data,
+    ggplot2::aes(x=x_closest,y=y_closest,xend=x_closest_end,yend=y_closest_end),
+    arrow = ggplot2::arrow(length = ggplot2::unit(0.03, "npc"), ends = "first")
+  ))
+i = i + 1
 
