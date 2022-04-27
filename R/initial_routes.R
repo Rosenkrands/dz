@@ -235,11 +235,11 @@ route_clustering <- function(init_routes, k, measure = "position-based") {
     }
 
     # find all combinations of routes and compute dissimilarity
-    combinations <- utils::combn(1:num_routes, 2, simplify = F)
+    combinations <- utils::combn(1:length(init_routes), 2, simplify = F)
     dis <- pbapply::pblapply(combinations, position_dissimilarity)
 
     # create matrix to hold results
-    dissimilarity <- matrix(data = 0, nrow = num_routes, ncol = num_routes)
+    dissimilarity <- matrix(data = 0, nrow = length(init_routes), ncol = length(init_routes))
 
     # take dissimilarity values from the list and insert into the matrix
     lapply(seq_along(combinations), function(i) {
