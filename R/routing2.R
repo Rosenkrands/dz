@@ -284,6 +284,21 @@ starting_routes <- function(inst, zones, L) {
 
     route <- sapply(route, function(x) lookup$local_id[lookup$id == x])
 
+    # Fix instant repeat of nodes in route
+    j = 1
+    while (j %in% (1:(length(route)-1))) {
+      if (is.na(route[j+1])) {
+        break
+      }
+      print(j)
+      if (route[j] == route[j+1]) {
+        route <- route[-j]
+        j = j - 1
+        print(route)
+      }
+      j = j + 1
+    }
+
     map$score[route] <- 0
 
     candidates <- map$local_id[!(map$local_id) %in% route]
