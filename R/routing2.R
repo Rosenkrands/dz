@@ -502,12 +502,13 @@ plot.starting_routes <- function(sr, inst) {
     )
 }
 
-# inst = test_instances$p7_chao; L = 80; k = 3
-# info <- generate_information(inst = inst, r = 20)
-# generated_variances <- generate_variances(inst = inst)
-# clust_obj <- rb_clustering(inst = inst, num_route = 80, info = info, variances = generated_variances, k = 3, L = 80)
-#
-# sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 80)
+inst = test_instances$p7_chao; L = 100; k = 3
+info <- generate_information(inst = inst, r = 20)
+generated_variances <- generate_variances(inst = inst)
+p_inst <- prepare_instance(inst, variances = generated_variances, info = info)
+clust_obj <- rb_clustering(p_inst = p_inst, num_route = 100, info = info, k = 3, L = 100)
+
+sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 100)
 
 
 #' Update the starting routes based on realized scores
@@ -708,7 +709,15 @@ update_routes <- function(sr, L, variances, info) {
       # We remove two and add at least two, so we need to track how many more we add to route
       longer_than_original <- 0
       # Check length constraint
-      L_remaining <- L - route_length(route = route)
+      if (route[length(route)] != 1) {
+        sp_check <- dist2(route[(length(route))], 1, g = g)
+        route_check <- append(route, sp_check[2:(length(sp_check))], after = (length(route)))
+      } else {
+        route_check <- route
+      }
+      cat("Route is now:", "\n")
+      print(route_check)
+      L_remaining <- L - route_length(route = route_check)
       L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst) + dist(remaining_nodes[2], 1, dst = dst)
       while (L_remaining < L_required) {
         SDR_cand[New_point] <- 0
@@ -800,8 +809,8 @@ update_routes <- function(sr, L, variances, info) {
   )
 }
 
-# ur <- update_routes(sr = sr, L = 80, variances = generated_variances, info = info)
-
+ur <- update_routes(sr = sr, L = sr$L, variances = generated_variances, info = info)
+g = test_instances$p7_chao$g
 
 # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 #
