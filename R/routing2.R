@@ -393,8 +393,8 @@ starting_routes <- function(inst, zones, L) {
   }
 
   # Testing
-  r <- solve_routing(zone_id =  1)
-  imr <- improve_routing(L_remaining = r$L_remaining, route = r$route, L = 100, zone_id = 1)
+  # r <- solve_routing(zone_id =  1)
+  # imr <- improve_routing(L_remaining = r$L_remaining, route = r$route, L = 100, zone_id = 1)
 
   # we want to create a route for each zone
   routing_results <- tibble::tibble(agent_id = 1:length(zones))
@@ -405,12 +405,23 @@ starting_routes <- function(inst, zones, L) {
     function(zone_id) {solve_routing(obj = "SDR", L = L, zone_id = zone_id)}
   )
 
+  improved_routes <- lapply(
+    routing_results$agent_id,
+    function(zone_id) {improve_routing(
+      L_remaining = initial_routes[[zone_id]]$L_remaining,
+      route = initial_routes[[zone_id]]$route,
+      L = L,
+      zone_id = zone_id
+    )}
+  )
+
   # return(initial_routes)
 
   structure(
     list(
       "initial_routes" = lapply(initial_routes, function(x) x$route),
-      "L_remaining" = lapply(initial_routes, function(x) x$L_remaining),
+      "improved_routes" = lapply(improved_routes, function(x) x$route),
+      "L_remaining" = lapply(improved_routes, function(x) x$L_remaining),
       "s_total" = lapply(initial_routes, function(x) x$s_total),
       "zones" = zones,
       "L" = L
