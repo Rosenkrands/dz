@@ -172,10 +172,21 @@ starting_routes <- function(inst, zones, L) {
           all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
           route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
           ### Remove duplicate e.g. 1 56 ... 30 1 30 1
-          for (i in 1:(length(route)-3)) {
+          # for (i in 1:(length(route)-3)) {
+          #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
+          #     route <- route[-i]; route <- route[-i]
+          #   }
+          # }
+          i = 1
+          while (i %in% (1:(length(route)-3))) {
+            if (is.na(route[i+3])) {
+              break
+            }
             if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
               route <- route[-i]; route <- route[-i]
+              i = i - 2
             }
+            i = i + 1
           }
           route_global <- vector(length = length(route))
           for (i in 1:length(route)){
@@ -253,12 +264,8 @@ starting_routes <- function(inst, zones, L) {
   }
 
   # Use the result from solve_routing and update by adding until no more range in the same way as sovle_routing
-  r <- solve_routing(zone_id =  1)
-  r$route
-  r$L_remaining
-  L <- 100
 
-  improve_routing <- function(L_remaining = r$L_remaining, L = L, route = r$route, zone_id = 1){
+  improve_routing <- function(L_remaining, L , route, zone_id){
     # L_remaining = r$L_remaining; route = r$route; zone_id = 1
     # route <- lookup$local_id[match(lookup$local_id, route)]
     map = all_points |>
@@ -290,11 +297,9 @@ starting_routes <- function(inst, zones, L) {
       if (is.na(route[j+1])) {
         break
       }
-      print(j)
       if (route[j] == route[j+1]) {
         route <- route[-j]
         j = j - 1
-        print(route)
       }
       j = j + 1
     }
@@ -343,7 +348,7 @@ starting_routes <- function(inst, zones, L) {
           route_global[i] <- lookup$id[route[i]]
         }
         L_remaining <- L - route_length(route = route, g = g)
-        output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+        output <- list("route" = route_global, "L_remaining" = L_remaining, "delsgs" = delsgs, "lookup" = lookup)
         return(output)
       }
       # Værdien i New_node er candidate id_local med højest SDR og indgangen er hvor i ruten det tilføjes efter
@@ -361,17 +366,35 @@ starting_routes <- function(inst, zones, L) {
       # map$score[New_node[New_node_placement]] <- 0
       map$score[unique(c(short_path_to, short_path_back))] <- 0
       ### Remove duplicate e.g. 1 56 ... 30 1 30 1
-      for (i in 1:(length(route)-4)) {
+      # for (i in 1:(length(route)-4)) {
+      #   if ((route[i] == route[i+2]) && (route[i+1] == route[i+3])) {
+      #     route <- route[-i]; route <- route[-i]
+      #   }
+      # }
+      i = 1
+      while (i %in% (1:(length(route)-3))) {
+        if (is.na(route[i+3])) {
+          break
+        }
         if ((route[i] == route[i+2]) && (route[i+1] == route[i+3])) {
           route <- route[-i]; route <- route[-i]
+          i = i - 2
         }
+        i = i + 1
       }
     }
-    return(route)
+    route_global <- vector(length = length(route))
+    for (i in 1:length(route)){
+      route_global[i] <- lookup$id[route[i]]
+    }
+    L_remaining <- L - route_length(route = route, g = g)
+    output <- list("route" = route_global, "L_remaining" = L_remaining, "delsgs" = delsgs, "lookup" = lookup)
+    return(output)
   }
 
   # Testing
-  imr <- improve_routing()
+  r <- solve_routing(zone_id =  1)
+  imr <- improve_routing(L_remaining = r$L_remaining, route = r$route, L = 100, zone_id = 1)
 
   # we want to create a route for each zone
   routing_results <- tibble::tibble(agent_id = 1:length(zones))
