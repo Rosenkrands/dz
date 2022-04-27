@@ -1,5 +1,5 @@
 library(dz)
-set.seed(5)
+set.seed(10)
 
 # Setting parameters
 inst <- test_instances$p7_chao
@@ -20,3 +20,5 @@ plot(rb_clust)
 zones <- rb_clust$zones
 system.time(sr <- starting_routes(inst, zones, L))
 plot(sr, inst)
+
+ur <- update_routes(sr, L, variances, info)

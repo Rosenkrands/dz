@@ -400,12 +400,14 @@ starting_routes <- function(inst, zones, L) {
   routing_results <- tibble::tibble(agent_id = 1:length(zones))
 
   # calculate the routes
-  initial_routes <- lapply(
+  message("Finding the initial routes")
+  initial_routes <- pbapply::pblapply(
     routing_results$agent_id,
     function(zone_id) {solve_routing(obj = "SDR", L = L, zone_id = zone_id)}
   )
 
-  improved_routes <- lapply(
+  message("Trying to improve initial routes")
+  improved_routes <- pbapply::pblapply(
     routing_results$agent_id,
     function(zone_id) {improve_routing(
       L_remaining = initial_routes[[zone_id]]$L_remaining,
@@ -524,8 +526,8 @@ update_routes <- function(sr, L, variances, info) {
   # For testing purposes:
   # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 
-  # zones <- sr$zones
-  zones <- sr$lookup$id
+  zones <- sr$zones
+  # zones <- sr$lookup$id
 
   # Join zones on instance
   map <- inst$points |>
