@@ -5,11 +5,10 @@
 \title{Routing based clustering}
 \usage{
 rb_clustering(
-  inst,
+  p_inst,
   L,
   k,
   num_routes,
-  variances,
   info,
   dispute_obj = "most_frequent",
   shiny = F

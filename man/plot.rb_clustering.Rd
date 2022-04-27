@@ -4,7 +4,7 @@
 \alias{plot.rb_clustering}
 \title{Plot the result from routing-based clustering}
 \usage{
-\method{plot}{rb_clustering}(rb_clust, inst)
+\method{plot}{rb_clustering}(rb_clust)
 }
 \arguments{
 \item{inst}{}

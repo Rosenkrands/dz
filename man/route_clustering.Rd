@@ -4,12 +4,14 @@
 \alias{route_clustering}
 \title{Perfrom hierarchical clustering based on initial routes}
 \usage{
-route_clustering(init_routes, k)
+route_clustering(init_routes, k, measure = "position-based")
 }
 \arguments{
 \item{init_routes}{a list of initial routes obtained from the `initial_route` function}
 
 \item{k}{the number of agents}
+
+\item{measure}{what dissimilarity measure to use, can be either "element-based" or "position-based". Defaults to "position-based".}
 }
 \value{
 a list containing the `hclust` object and a vector of the clusters
