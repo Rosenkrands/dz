@@ -9,7 +9,7 @@
 #'
 starting_routes <- function(inst, zones, L) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones
+  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20);p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones
 
   # Join zones on instance
   all_points <- inst$points |>
@@ -87,7 +87,7 @@ starting_routes <- function(inst, zones, L) {
 
   # solve routing for each zone to get initial route
   solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
-    # obj = 'SDR'; L = 100; zone_id = 3
+    # obj = 'SDR'; L = 100; zone_id = 1
     L_remaining <- L
     map = all_points |>
       dplyr::filter((id == 1) | (zone == zone_id))
@@ -202,6 +202,8 @@ starting_routes <- function(inst, zones, L) {
         route_temp <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
         L_remaining <- L - route_length(route = route_temp, g = g)
         SDR <- rep(0, length(SDR))
+        print(route_temp)
+        route <- route_temp
       }
       # print(route)
       # if (L_remaining < 50) {
@@ -747,7 +749,7 @@ update_routes <- function(sr, L, variances, info) {
   )
 }
 
-ur <- update_routes(sr = sr, L = 80, variances = generated_variances, info = info)
+# ur <- update_routes(sr = sr, L = 80, variances = generated_variances, info = info)
 
 
 # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
