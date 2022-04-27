@@ -122,8 +122,12 @@ i = 1
 value <- el_dis_vec[i]
 ids <- combinations[[names(el_dis_vec[i]) |> as.integer()]]
 route1 <- init_routes[[ids[1]]]$route; route2 <- init_routes[[ids[2]]]$route
-plot_two_routes(route1, route2) + ggplot2::ggtitle(label = paste0("element-based dissimilarity: ", round(value, 3)), subtitle = paste(ids, collapse = " - "))
+plot_two_routes(route1, route2) + ggplot2::ggtitle(label = paste0("EBD = ", round(value, 3), " PBD = ", round(dis_mat[ids[1], ids[2]], 3)), subtitle = paste(ids, collapse = " - "))
 i = i + 1
+
+for (i in 1:length(combinations)) {if (identical(combinations[[names(el_dis_vec[i]) |> as.integer()]], c(39L,54L))) print(i)}
 
 # example is 39-54 and 39-53 (with set.seed(7))
 dis_mat[39,54]; dis_mat[39,53]
+
+dis_vec[as.character(i)]
