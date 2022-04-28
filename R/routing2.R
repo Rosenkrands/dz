@@ -441,7 +441,7 @@ starting_routes <- function(inst, zones, L) {
 #' @export
 #'
 plot.starting_routes <- function(sr, inst) {
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
+  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); p_inst <- prepare_instance(inst, variances, info) rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 
   temp <- tibble::tibble(id = sr$zones, agent_id = 1:length(sr$zones)) |>
     tidyr::unnest(cols = id)
