@@ -730,8 +730,14 @@ update_routes <- function(sr, L, variances, info) {
         L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst) + dist(remaining_nodes[2], 1, dst = dst)
         if (max(SDR_cand) == 0) {
           print("max SDR cand is 0")
-          sp_rm2_home <- dist2(remaining_nodes[2], 1, g = g)
-          route_final <- append(route, sp_rm2_home)
+          if (remaining_nodes[2] == 1) {
+            route_final <- append(route, 1)
+          } else {
+            sp_rm2_home <- dist2(remaining_nodes[2], 1, g = g)
+            route_final <- append(route, sp_rm2_home)
+          }
+          print(route_final)
+          print(remaining_nodes[2])
           if (L > route_length(route_final)) {
             print("Can reach rm2 before returning")
             print(route_final)
@@ -803,7 +809,7 @@ update_routes <- function(sr, L, variances, info) {
   }
 
   # sr <- starting_routes(inst = inst, zones = rb_clust$zones, L = 100)
-  # update_routing(initial_route = sr$improved_routes[[3]], zone_id = 3, L = 100, L_remaining = sr$L_remaining[[3]])
+  # update_routing(initial_route = sr$improved_routes[[1]], zone_id = 1, L = 100, L_remaining = sr$L_remaining[[1]])
 
 
   # we want to create a route for each zone
