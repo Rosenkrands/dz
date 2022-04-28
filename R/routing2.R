@@ -742,11 +742,13 @@ update_routes <- function(sr, L, variances, info) {
             print("Can reach rm2 before returning")
             print(route_final)
             route <- route_final
-            remaining_nodes <- c()
-            break
-            }
+          } else {
+            route <- append(route, dist2(route[length(route)], 1, g = g)[-1])
           }
+          remaining_nodes <- c()
+          break
         }
+      }
       # if (remaining_route[1] == remaining_route[3]) {remaining_route <- remaining_route[3:length(remaining_route)]}
 
       if ((max(SDR_cand) > SDR_planned_realized)  & !(New_point %in% remaining_route) & (L_remaining > L_required) ){
