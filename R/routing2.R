@@ -502,13 +502,13 @@ plot.starting_routes <- function(sr, inst) {
     )
 }
 
-inst = test_instances$p7_chao; L = 100; k = 3
-info <- generate_information(inst = inst, r = 20)
-generated_variances <- generate_variances(inst = inst)
-p_inst <- prepare_instance(inst, variances = generated_variances, info = info)
-clust_obj <- rb_clustering(p_inst = p_inst, num_route = 100, info = info, k = 3, L = 100)
-
-sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 100)
+# inst = test_instances$p7_chao; L = 100; k = 3
+# info <- generate_information(inst = inst, r = 20)
+# generated_variances <- generate_variances(inst = inst)
+# p_inst <- prepare_instance(inst, variances = generated_variances, info = info)
+# clust_obj <- rb_clustering(p_inst = p_inst, num_route = 100, info = info, k = 3, L = 100)
+#
+# sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 100)
 
 
 #' Update the starting routes based on realized scores
@@ -723,7 +723,7 @@ update_routes <- function(sr, L, variances, info) {
         SDR_cand[New_point] <- 0
         New_point <- which.max(SDR_cand)
         L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst)
-        if (New_point == 1) {break}
+        if (max(SDR_cand) == 0) {break}
       }
       # if (remaining_route[1] == remaining_route[3]) {remaining_route <- remaining_route[3:length(remaining_route)]}
       cat("Remaining length:", "\n")
@@ -778,7 +778,7 @@ update_routes <- function(sr, L, variances, info) {
     }
     # Return L and Score with the routes
     # print(plot_progress())
-    output <- list("route" = route, "s_total" = route_score(route, id_next_placement = length(route)))
+    output <- list("route" = route, "s_total" = route_score(route, id_next_placement = length(route)), "L_remaining" = L - route_length(route))
     return(output)
   }
 
@@ -800,7 +800,7 @@ update_routes <- function(sr, L, variances, info) {
   structure(
     list(
       "updated_routes" = lapply(updated_routes, function(x) x$route),
-      # "L_remaining" = lapply(initial_routes, function(x) x$L_remaining),
+      "L_remaining" = lapply(updated_routes, function(x) x$L_remaining),
       "s_total" = lapply(updated_routes, function(x) x$s_total),
       "zones" = zones,
       "L" = L
@@ -809,8 +809,8 @@ update_routes <- function(sr, L, variances, info) {
   )
 }
 
-ur <- update_routes(sr = sr, L = sr$L, variances = generated_variances, info = info)
-g = test_instances$p7_chao$g
+# ur <- update_routes(sr = sr, L = sr$L, variances = generated_variances, info = info)
+# g = test_instances$p7_chao$g
 
 # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 #
@@ -844,7 +844,7 @@ plot.updated_routes <- function(ur, inst) {
     dplyr::mutate(zone = ifelse(zone.x == 0, zone.y, zone.x)) |>
     dplyr::select(-c(zone.x,zone.y))
 
-  route_segments <- tibble::tibble(routes = ur$updated_routes, agent_id = 1:length(sr$initial_routes)) |>
+  route_segments <- tibble::tibble(routes = ur$updated_routes, agent_id = 1:length(ur$updated_routes)) |>
     tidyr::unnest(routes) |>
     dplyr::group_by(agent_id) |>
     dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
