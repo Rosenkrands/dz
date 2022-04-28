@@ -502,15 +502,6 @@ plot.starting_routes <- function(sr, inst) {
     )
 }
 
-<<<<<<< HEAD
-inst = test_instances$p7_chao; L = 100; k = 3
-info <- generate_information(inst = inst, r = 20)
-generated_variances <- generate_variances(inst = inst)
-p_inst <- prepare_instance(inst, variances = generated_variances, info = info)
-clust_obj <- rb_clustering(p_inst = p_inst, num_route = 100, info = info, k = 3, L = 100)
-
-sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 200)
-=======
 # inst = test_instances$p7_chao; L = 100; k = 3
 # info <- generate_information(inst = inst, r = 20)
 # generated_variances <- generate_variances(inst = inst)
@@ -518,7 +509,6 @@ sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 200)
 # clust_obj <- rb_clustering(p_inst = p_inst, num_route = 100, info = info, k = 3, L = 100)
 #
 # sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 100)
->>>>>>> ae06269062647bfa1565a7d9748c35aa5ef3201b
 
 
 #' Update the starting routes based on realized scores
