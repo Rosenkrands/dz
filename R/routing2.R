@@ -525,7 +525,7 @@ plot.starting_routes <- function(sr, inst) {
 
 update_routes <- function(sr, L, variances, info) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
+  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); p_inst <- prepare_instance(inst, variances = generated_variances, info = info); rb_clust <- rb_clustering(p_inst = p_inst, num_route = 100, info = info, k = 3, L = 100); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 
   zones <- sr$zones
   # zones <- sr$lookup$id
@@ -585,7 +585,7 @@ update_routes <- function(sr, L, variances, info) {
 
   # update routes for each zone (multiple times)
   update_routing <- function(initial_route, zone_id, L, L_remaining) {
-    # initial_route = sr$initial_routes[[1]]; zone_id = 1; L = 150; L_remaining = sr$L_remaining[[1]]
+    # initial_route = sr$initial_routes[[3]]; zone_id = 3; L = 100; L_remaining = sr$L_remaining[[3]]
 
     delsgs <- same_zone_edges |>
       dplyr::filter(zone == zone_id) |>
@@ -712,25 +712,42 @@ update_routes <- function(sr, L, variances, info) {
       if (route[length(route)] != 1) {
         sp_check <- dist2(route[(length(route))], 1, g = g)
         route_check <- append(route, sp_check[2:(length(sp_check))], after = (length(route)))
+
       } else {
         route_check <- route
       }
       cat("Route is now:", "\n")
       print(route_check)
       L_remaining <- L - route_length(route = route_check)
-      L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst) + dist(remaining_nodes[2], 1, dst = dst)
-      while (L_remaining < L_required) {
-        SDR_cand[New_point] <- 0
-        New_point <- which.max(SDR_cand)
-        L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst)
-        if (max(SDR_cand) == 0) {break}
-      }
-      # if (remaining_route[1] == remaining_route[3]) {remaining_route <- remaining_route[3:length(remaining_route)]}
       cat("Remaining length:", "\n")
       print(L_remaining)
+      L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst) + dist(remaining_nodes[2], 1, dst = dst)
+      while ((L_remaining < L_required) && (length(remaining_nodes != 0))) {
+        SDR_cand[New_point] <- 0
+        New_point <- which.max(SDR_cand)
+        cat("New_point updated:", "\n")
+        print(New_point)
+        L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst) + dist(remaining_nodes[2], 1, dst = dst)
+        if (max(SDR_cand) == 0) {
+          print("max SDR cand is 0")
+          sp_rm2_home <- dist2(remaining_nodes[2], 1, g = g)
+          route_final <- append(route, sp_rm2_home)
+          if (L > route_length(route_final)) {
+            print("Can reach rm2 before returning")
+            print(route_final)
+            route <- route_final
+            remaining_nodes <- c()
+            break
+            }
+          }
+        }
+      # if (remaining_route[1] == remaining_route[3]) {remaining_route <- remaining_route[3:length(remaining_route)]}
+
       if ((max(SDR_cand) > SDR_planned_realized)  & !(New_point %in% remaining_route) & (L_remaining > L_required) ){
         # Remove the node that would originally be visited after id_next
         map$realized_score[New_point] <- 0
+        cat("Remaining nodes:", "\n")
+        print(remaining_nodes)
         remaining_route <- remaining_route[2:(length(remaining_route))]
         # Add new
         sp <- c(dist2(id_next, New_point, g = g)[2:(length(dist2(id_next, New_point, g = g)))],
@@ -758,10 +775,13 @@ update_routes <- function(sr, L, variances, info) {
           route <- append(route, sp_home[2:length(sp_home)])
           break
         }
-        # Go where we would anyway
-        route <- append(route, remaining_route[3])
-        # Update remaining_route by removing the ones already visited (excluding id_now and id_next for the next iteration)
-        remaining_route <- remaining_route[2:(length(remaining_route))]
+
+        if (route[length(route)] != 1) {
+          # Go where we would anyway
+          route <- append(route, remaining_route[3])
+          # Update remaining_route by removing the ones already visited (excluding id_now and id_next for the next iteration)
+          remaining_route <- remaining_route[2:(length(remaining_route))]
+        }
       }
       # Update remaining_nodes
       remaining_nodes <- remaining_nodes[remaining_nodes != (remaining_nodes[1])]
@@ -781,6 +801,10 @@ update_routes <- function(sr, L, variances, info) {
     output <- list("route" = route, "s_total" = route_score(route, id_next_placement = length(route)), "L_remaining" = L - route_length(route))
     return(output)
   }
+
+  # sr <- starting_routes(inst = inst, zones = rb_clust$zones, L = 100)
+  # update_routing(initial_route = sr$improved_routes[[3]], zone_id = 3, L = 100, L_remaining = sr$L_remaining[[3]])
+
 
   # we want to create a route for each zone
   routing_results <- tibble::tibble(agent_id = 1:length(zones))
