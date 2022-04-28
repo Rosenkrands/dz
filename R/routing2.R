@@ -9,7 +9,7 @@
 #'
 starting_routes <- function(inst, zones, L) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20);p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones
+  # inst = test_instances$p7_chao; L = 200; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20);p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones
 
   # Join zones on instance
   all_points <- inst$points |>
@@ -263,7 +263,7 @@ starting_routes <- function(inst, zones, L) {
     }
   }
 
-  # Use the result from solve_routing and update by adding until no more range in the same way as sovle_routing
+  # Use the result from solve_routing and update by adding until no more range in the same way as solve_routing
 
   improve_routing <- function(L_remaining, L , route, zone_id){
     # L_remaining = r$L_remaining; route = r$route; zone_id = 1
@@ -508,7 +508,7 @@ generated_variances <- generate_variances(inst = inst)
 p_inst <- prepare_instance(inst, variances = generated_variances, info = info)
 clust_obj <- rb_clustering(p_inst = p_inst, num_route = 100, info = info, k = 3, L = 100)
 
-sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 100)
+sr <- starting_routes(inst = inst, zones = clust_obj$zones, L = 200)
 
 
 #' Update the starting routes based on realized scores
@@ -723,7 +723,7 @@ update_routes <- function(sr, L, variances, info) {
         SDR_cand[New_point] <- 0
         New_point <- which.max(SDR_cand)
         L_required <- dist(id_next, New_point, dst = dst) + dist(New_point, remaining_nodes[2], dst = dst)
-        if (New_point == 1) {break}
+        if (max(SDR_cand) == 0) {break}
       }
       # if (remaining_route[1] == remaining_route[3]) {remaining_route <- remaining_route[3:length(remaining_route)]}
       cat("Remaining length:", "\n")
