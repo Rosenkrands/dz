@@ -204,7 +204,7 @@ plot.initial_route <- function(init_route, inst) {
 #' @return a list containing the `hclust` object and a vector of the clusters
 #' @export
 #'
-route_clustering <- function(init_routes, k, measure = "position-based") {
+route_clustering <- function(p_inst, init_routes, k, measure = "position-based") {
   if (measure == "element-based") {
     compute_dissimilarity <- function(i,j) {
       nodes_i <- unique(init_routes[[i]]$route)
@@ -462,7 +462,7 @@ rb_clustering <- function(p_inst, L, k, num_routes, info, dispute_obj = "most_fr
 
   # Then we perform the route clustering
   message("Performing the clustering")
-  rc <- route_clustering(init_routes, k); cluster <- rc$cutree
+  rc <- route_clustering(p_inst, init_routes, k); cluster <- rc$cutree
 
   # Next is assignment of the disputed points
   suppressMessages(
