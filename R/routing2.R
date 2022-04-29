@@ -265,9 +265,12 @@ starting_routes <- function(inst, zones, L) {
 
   # Use the result from solve_routing and update by adding until no more range in the same way as solve_routing
 
-  improve_routing <- function(L_remaining, L , route, zone_id){
+  improve_routing <- function(L_remaining, L, route, zone_id){
     # L_remaining = r$L_remaining; route = r$route; zone_id = 1
     # route <- lookup$local_id[match(lookup$local_id, route)]
+
+    L_remaining <- L_remaining/2
+
     map = all_points |>
       dplyr::filter((id == 1) | (zone == zone_id))
 
@@ -412,6 +415,7 @@ starting_routes <- function(inst, zones, L) {
     function(zone_id) {improve_routing(
       L_remaining = initial_routes[[zone_id]]$L_remaining,
       route = initial_routes[[zone_id]]$route,
+      # L = L - initial_routes[[zone_id]]$L_remaining/2,
       L = L,
       zone_id = zone_id
     )}
@@ -459,7 +463,7 @@ plot.starting_routes <- function(sr, inst) {
     dplyr::mutate(zone = ifelse(zone.x == 0, zone.y, zone.x)) |>
     dplyr::select(-c(zone.x,zone.y))
 
-  route_segments <- tibble::tibble(routes = sr$initial_routes, agent_id = 1:length(sr$initial_routes)) |>
+  route_segments <- tibble::tibble(routes = sr$improved_routes, agent_id = 1:length(sr$improved_routes)) |>
     tidyr::unnest(routes) |>
     dplyr::group_by(agent_id) |>
     dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
