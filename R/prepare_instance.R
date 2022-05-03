@@ -18,21 +18,34 @@ prepare_instance <- function(inst, variances, info) {
     dplyr::mutate(dplyr::across(.cols = c(score_variance, p_unexpected), ~ tidyr::replace_na(.x, 0))) |>
     dplyr::rowwise() |>
     dplyr::mutate(
-      realized_score = rnorm(1, mean = score, sd = sqrt(score_variance)),
-      unexpected = purrr::rbernoulli(1, p = p_unexpected)
+      unexpected = purrr::rbernoulli(1, p = p_unexpected),
+      realized_score = score,
+      expected_score = score
     )|>
     dplyr::ungroup()
 
   # Update realized score to account for information from unexpected events
   for (i in inst$points$id) { # we need to consider all nodes
-    if (inst$points$unexpected[i]) {
-      related_nodes <- which(info[i,] != 0) # find the nodes that are related
-      for (j in related_nodes) { # update score
-        # Only update the scores for unvisited points
-        inst$points$realized_score[j] <- inst$points$realized_score[j] + info[i,j]
+    related_nodes <- which(info[i,] != 0) # find the nodes that are related
+    for (j in related_nodes) { # update score
+      inst$points$expected_score[j] <- inst$points$score[j] + inst$points$p_unexpected[i] * info[i,j]
+      if (inst$points$unexpected[i]) {
+        inst$points$realized_score[j] <- inst$points$score[j] + info[i,j]
       }
     }
   }
+
+  # # update expected score
+  # id_now = 1
+  # related_nodes <- which(info[id_now,] != 0)
+  # for (i in related_nodes) {
+  #   inst$points$expected_score[i] <- inst$points$expected_score[i] - inst$points$p_unexpected[i] * info[i,j]
+  #   if (inst$points$unexpected) {
+  #     inst$points$expected_score[i] <- inst$points$expected_score[i] + info[i,j]
+  #   }
+  # }
+
+  inst$points$expected_score[1] <- 0; inst$points$realized_score[1] <- 0
 
   class(inst) <- "prepared_instance"
   return(inst)

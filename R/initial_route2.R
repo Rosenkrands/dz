@@ -9,12 +9,13 @@
 #' @return A route satisfying the range constraint, represented as an integer vector
 #' @export
 #'
-initial_route2 <- function(p_inst, L, info) {
+initial_route2 <- function(p_inst, L, info, top_percentile = .15) {
   # For testing purposes:
   # inst <- test_instances$p7_chao;L <- 100;variances <- generate_variances(inst);info <- generate_information(inst);p_inst <- prepare_instance(inst, variances, info)
 
   # Make copies of variables to alter during route generation
   score <- p_inst$points$score
+  expected_score <- p_inst$points$expected_score
   realized_score <- p_inst$points$realized_score
   unexpected <- p_inst$points$unexpected
 
@@ -49,7 +50,7 @@ initial_route2 <- function(p_inst, L, info) {
   L_remaining <- L
   route_concluded <- F
 
-  get_SDR <- function(current_node, L_remaining, score) {
+  get_SDR <- function(current_node, L_remaining, score, top_percentile) {
     # current_node = 1
 
     # The shortest paths to all node
@@ -76,13 +77,15 @@ initial_route2 <- function(p_inst, L, info) {
     r <- s/d * feasible; r[is.na(r) | !is.finite(r)] <- 0
 
     # return SDR for the feasible nodes
-    r[(r > 0) & names(r) != "1"]
+    candidates <- r[(r > 0) & names(r) != "1"]
+    rslt <- candidates[1:round(length(candidates)*top_percentile)]
+    if (is.na(rslt)) return(integer()) else return(rslt)
   }
 
   # iterate this part
   while(!route_concluded) {
     # Decide on the next node
-    sdr <- get_SDR(current_node, L_remaining, score)
+    sdr <- get_SDR(current_node, L_remaining, expected_score, top_percentile)
     candidates <- sdr |> names() |> as.integer()
 
     if (length(candidates) > 1) { # there are multiple candidates
@@ -101,23 +104,27 @@ initial_route2 <- function(p_inst, L, info) {
     score[path_to_next] <- 0
     L_remaining <- L_remaining - dst[current_node, node_id]
 
+    # update expected score
+    related_nodes <- which(info[node_id,] != 0)
+
     # check if anything was unexpected and update the correlated scores
-    for (j in path_to_next) { # we need to consider all nodes in the shortest path
-      if (unexpected[j]) {
-        related_nodes <- which(info[j,] != 0) # find the nodes that are related
-        for (k in related_nodes) { # update score
-          # TODO: What if the score have already been gather do we want to add new score or ignore points that are already visited?
-          # Only update the scores for unvisited points
-          score[k] <- score[k] + info[j,k]
+    for (i in path_to_next) {
+      related_nodes <- which(info[i,] != 0)
+      for (j in related_nodes) {
+        if (!j %in% route) {
+          expected_score[j] <- expected_score[j] - p_inst$points$p_unexpected[j] * info[i,j]
+          if (unexpected[i]) {
+            expected_score[j] <- expected_score[j] + info[i,j]
+          }
         }
-        unexpected[j] <- F
       }
+      unexpected[i] <- F
     }
 
     current_node <- tail(route, 1)
   }
   message("Total realized score is: ", round(sum(p_inst$points$realized_score[route]), 1))
-  message("Total expected score is: ", sum(p_inst$points$score[route]))
+  message("Total expected score is: ", sum(p_inst$points$expected_score[route]))
   message("L is: ", round(L - L_remaining,1))
   # message("Route is: ", route)
   # return(route)
@@ -125,7 +132,7 @@ initial_route2 <- function(p_inst, L, info) {
     list(
       "route" = route,
       "realized_score" = sum(p_inst$points$realized_score[route]),
-      "expected_score" = sum(p_inst$points$score[route]),
+      "expected_score" = sum(p_inst$points$expected_score[route]),
       "L" = L - L_remaining
     ),
     class = "initial_route2"

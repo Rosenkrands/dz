@@ -2,9 +2,9 @@
 % Please edit documentation in R/initial_routes.R
 \name{route_clustering}
 \alias{route_clustering}
-\title{Perfrom hierarchical clustering based on initial routes}
+\title{Perform hierarchical clustering based on initial routes}
 \usage{
-route_clustering(init_routes, k, measure = "position-based")
+route_clustering(p_inst, init_routes, k, measure = "position-based")
 }
 \arguments{
 \item{init_routes}{a list of initial routes obtained from the `initial_route` function}
@@ -17,5 +17,5 @@ route_clustering(init_routes, k, measure = "position-based")
 a list containing the `hclust` object and a vector of the clusters
 }
 \description{
-Perfrom hierarchical clustering based on initial routes
+Perform hierarchical clustering based on initial routes
 }

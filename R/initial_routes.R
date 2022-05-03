@@ -195,7 +195,7 @@ plot.initial_route <- function(init_route, inst) {
     ggplot2::guides(shape = "none", size = "none")
 }
 
-#' Perfrom hierarchical clustering based on initial routes
+#' Perform hierarchical clustering based on initial routes
 #'
 #' @param init_routes a list of initial routes obtained from the `initial_route` function
 #' @param k the number of agents
@@ -204,7 +204,7 @@ plot.initial_route <- function(init_route, inst) {
 #' @return a list containing the `hclust` object and a vector of the clusters
 #' @export
 #'
-route_clustering <- function(p_inst, init_routes, k, measure = "position-based") {
+route_clustering <- function(p_inst, init_routes, k, measure = "position-based", weigthed = T) {
   if (measure == "element-based") {
     compute_dissimilarity <- function(i,j) {
       nodes_i <- unique(init_routes[[i]]$route)
@@ -226,12 +226,17 @@ route_clustering <- function(p_inst, init_routes, k, measure = "position-based")
       routes <- list(init_routes[[ids[1]]]$route, init_routes[[ids[2]]]$route)
       longest_route <- do.call(c, lapply(routes, length)) |> which.max()
 
-      sapply(
+      mean_dist <- sapply(
         routes[[longest_route]],
         function(node_id) {
           p_inst$dst[node_id, unique(routes[-longest_route][[1]])] |> min()
         }
       ) |> mean()
+
+      # beta determines if the realized score of the two routes are close to each other
+      beta <- 1/abs((init_routes[[ids[1]]]$realized_score - init_routes[[ids[2]]]$realized_score))
+
+      return(c("mean_dist" = mean_dist, "beta" = beta))
     }
 
     # find all combinations of routes and compute dissimilarity
@@ -241,10 +246,34 @@ route_clustering <- function(p_inst, init_routes, k, measure = "position-based")
     # create matrix to hold results
     dissimilarity <- matrix(data = 0, nrow = length(init_routes), ncol = length(init_routes))
 
+    # post processing to weight dissimilarities
+
+    # mu is the mean realized score for the initial routes
+    mu <- mean(sapply(init_routes, function(x) x$realized_score))
+    mu_pbd <- mean(sapply(dis, function(x) x["mean_dist"]))
+    all_beta <- sapply(dis, function(x) x["beta"])
+    max_beta <- max(all_beta[!is.na(all_beta) & is.finite(all_beta)])
+
+    adjustment <- numeric(length = length(combinations))
+
     # take dissimilarity values from the list and insert into the matrix
     lapply(seq_along(combinations), function(i) {
       ids <- combinations[[i]]
-      dissimilarity[ids[1], ids[2]] <<- dis[[i]]
+
+      # alpha determines the ratio of ids[1]'s realized to the mean realized score
+      alpha <- init_routes[[ids[1]]]$realized_score/mu
+
+      if (!is.finite(all_beta[i])) beta <- max_beta else beta <- all_beta[i]
+
+      gamma <- dis[[i]]["mean_dist"] - mu_pbd
+
+      adjustment[i] <<- alpha*beta*gamma
+
+      if (weigthed) {
+        dissimilarity[ids[1], ids[2]] <<- dis[[i]]["mean_dist"] * alpha * beta * gamma
+      } else {
+        dissimilarity[ids[1], ids[2]] <<- dis[[i]]["mean_dist"]
+      }
     })
 
     # mirror the upper part of the matrix into the lower part
@@ -299,7 +328,7 @@ resolve_disputes <- function(init_routes, cluster, obj = "most_frequent") {
     dplyr::left_join(route_score, by = c("id", "cluster")) |>
     dplyr::summarise(num_cluster_use = dplyr::n_distinct(cluster),
                      most_frequent = dplyr::first(cluster, order_by = -n),
-                     highest_mean_expected_score = dplyr::first(cluster, order_by = -mean_expected_score)) |>
+                     highest_mean_realized_score = dplyr::first(cluster, order_by = -mean_realized_score)) |>
     dplyr::mutate(disputed = ifelse(num_cluster_use > 1, 1, 0)) |>
     dplyr::ungroup()
 
@@ -311,7 +340,7 @@ resolve_disputes <- function(init_routes, cluster, obj = "most_frequent") {
     # add the most frequent undisputed points to each zone
     filtered_nodes <- node_usage |>
       purrr::when(obj == "most_frequent" ~ dplyr::filter(., most_frequent == i),
-                  obj == "highest_score" ~ dplyr::filter(., highest_mean_expected_score == i),
+                  obj == "highest_score" ~ dplyr::filter(., highest_mean_realized_score == i),
                   ~ stop(paste0("obj: ", obj, " not recognized in resolve_disputes()")))
 
     ids_undisputed <- filtered_nodes |>
@@ -451,18 +480,18 @@ fix_connectivity <- function(inst, zones, available_nodes = integer()) {
 #' @return
 #' @export
 #'
-rb_clustering <- function(p_inst, L, k, num_routes, info, dispute_obj = "most_frequent", shiny = F) {
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); p_inst <- prepare_instance(inst, variances, info); dispute_obj = "most_frequent"; shiny = F; num_routes = 100; set.seed(3)
+rb_clustering <- function(p_inst, L, k, num_routes, info, dispute_obj = "most_frequent", measure = "position-based", weigthed = T,  shiny = F) {
+  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); p_inst <- prepare_instance(inst, variances, info); dispute_obj = "most_frequent"; shiny = F; num_routes = 100; measure = "position-based"; weigthed = T; set.seed(3)
 
   # First we generate the initial routes
-  message("Construct the initial rotues")
+  message("Construct the initial routes")
   suppressMessages(
     init_routes <- 1:num_routes |> as.list() |> pbapply::pblapply(function(x) {if (shiny) shiny::incProgress(amount = 1/num_routes); initial_route2(p_inst, L, info)})
   )
 
   # Then we perform the route clustering
   message("Performing the clustering")
-  rc <- route_clustering(p_inst, init_routes, k); cluster <- rc$cutree
+  rc <- route_clustering(p_inst, init_routes, k, measure = measure, weigthed = weigthed); cluster <- rc$cutree
 
   # Next is assignment of the disputed points
   suppressMessages(

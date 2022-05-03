@@ -1,10 +1,10 @@
 library(dz)
-set.seed(1)
+# set.seed(1)
 
 # setup the initial variables and clustering
 inst <- test_instances$p7_chao
 L <- 100
-k <- 3
+k <- 4
 variances <- generate_variances(inst)
 info <- generate_information(inst)
 
@@ -120,7 +120,7 @@ plot_progress <- function() {
 }
 
 # update routes
-zone_id <- 3
+zone_id <- 4
 
 # subgraph for the zone and distances
 sub_g <- igraph::induced_subgraph(p_inst$g, vids = sr$zones[[zone_id]]) # plot(sub_g)
@@ -134,6 +134,7 @@ remaining_route <- original_route[3:length(original_route)]
 
 # Make copies of variables to alter during route generation
 score <- p_inst$points$score
+expected_score <- p_inst$points$expected_score
 realized_score <- p_inst$points$realized_score
 unexpected <- p_inst$points$unexpected
 plot_progress()
@@ -143,6 +144,16 @@ while (length(remaining_route) != 0) {
 
   # update score
   score[id_now] <- 0; realized_score[id_now] <- 0
+
+  # update expected score
+  id_now = 1
+  related_nodes <- which(info[id_now,] != 0)
+  for (i in related_nodes) {
+    inst$points$expected_score[i] <- inst$points$expected_score[i] - inst$points$p_unexpected[i] * info[i,j]
+    if (inst$points$unexpected[id_now]) {
+      inst$points$expected_score[i] <- inst$points$expected_score[i] + info[i,j]
+    }
+  }
 
   if (unexpected[id_now]) { cat("unexpected observation at id_now, updating expected scores\n")
     related_nodes <- which(info[id_now,] != 0) # find the nodes that are related
@@ -183,6 +194,8 @@ while (length(remaining_route) != 0) {
 
   best_candidate <- as.integer(names(which.max(sdr)))
 
+  if (best_candidate %in% remaining_route) {best_candidate <- remaining_route[1]}
+
   if (best_candidate == remaining_route[1]) cat("No better candidate found\n")
 
   route <- append(route, best_candidate)
@@ -197,6 +210,9 @@ while (length(remaining_route) != 0) {
   plot_progress()
 
   if (remaining_route[1] == 1) {
+    id_now <- tail(route, 1); cat("id_now is", id_now, "\n")
+    score[id_now] <- 0; realized_score[id_now] <- 0
+
     route <- append(route, 1)
     remaining_route <- integer()
     break

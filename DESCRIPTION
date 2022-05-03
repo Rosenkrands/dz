@@ -30,7 +30,8 @@ Imports:
     Rfast,
     animation,
     cowplot,
-    shinyjs
+    shinyjs,
+    parallel
 Depends: 
     R (>= 2.10)
 LazyData: true
