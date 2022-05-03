@@ -11,11 +11,13 @@ rb_clustering(
   num_routes,
   info,
   dispute_obj = "most_frequent",
+  measure = "position-based",
+  weigthed = T,
   shiny = F
 )
 }
 \arguments{
-\item{info}{}
+\item{shiny}{}
 }
 \value{
 

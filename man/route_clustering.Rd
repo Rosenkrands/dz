@@ -4,7 +4,13 @@
 \alias{route_clustering}
 \title{Perform hierarchical clustering based on initial routes}
 \usage{
-route_clustering(p_inst, init_routes, k, measure = "position-based")
+route_clustering(
+  p_inst,
+  init_routes,
+  k,
+  measure = "position-based",
+  weigthed = T
+)
 }
 \arguments{
 \item{init_routes}{a list of initial routes obtained from the `initial_route` function}
