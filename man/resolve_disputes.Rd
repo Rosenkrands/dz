@@ -7,7 +7,7 @@
 resolve_disputes(init_routes, cluster, obj = "most_frequent")
 }
 \arguments{
-\item{init_routes}{a list of initial routes obtained from the `initial_route` function}
+\item{init_routes}{a list of initial routes obtained from the `initial_route2` function}
 
 \item{cluster}{a vector of clusters obtained from the `route_clustering` function}
 

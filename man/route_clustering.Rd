@@ -13,11 +13,13 @@ route_clustering(
 )
 }
 \arguments{
-\item{init_routes}{a list of initial routes obtained from the `initial_route` function}
+\item{init_routes}{a list of initial routes obtained from the `initial_route2` function}
 
 \item{k}{the number of agents}
 
 \item{measure}{what dissimilarity measure to use, can be either "element-based" or "position-based". Defaults to "position-based".}
+
+\item{weigthed}{}
 }
 \value{
 a list containing the `hclust` object and a vector of the clusters

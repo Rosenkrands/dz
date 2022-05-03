@@ -1,8 +1,10 @@
 #' Perform hierarchical clustering based on initial routes
 #'
-#' @param init_routes a list of initial routes obtained from the `initial_route` function
+#' @param p_inst
+#' @param init_routes a list of initial routes obtained from the `initial_route2` function
 #' @param k the number of agents
 #' @param measure what dissimilarity measure to use, can be either "element-based" or "position-based". Defaults to "position-based".
+#' @param weigthed
 #'
 #' @return a list containing the `hclust` object and a vector of the clusters
 #' @export
@@ -92,7 +94,7 @@ route_clustering <- function(p_inst, init_routes, k, measure = "position-based",
 
 #' Resolve disputes so each node are only assigned one cluster
 #'
-#' @param init_routes a list of initial routes obtained from the `initial_route` function
+#' @param init_routes a list of initial routes obtained from the `initial_route2` function
 #' @param cluster a vector of clusters obtained from the `route_clustering` function
 #' @param obj what objective to use when solving the disputes, currently there are "most_frequent" and "highest_score"
 #'
@@ -164,7 +166,9 @@ resolve_disputes <- function(init_routes, cluster, obj = "most_frequent") {
 
 #' Fix connectivity in zones
 #'
+#' @param inst
 #' @param zones
+#' @param available_nodes
 #'
 #' @return
 #' @export
@@ -356,7 +360,6 @@ rb_clustering <- function(p_inst, L, k, num_routes, info, dispute_obj = "most_fr
 #' Plot the result from routing-based clustering
 #'
 #' @param rb_clust
-#' @param inst
 #'
 #' @return
 #' @export

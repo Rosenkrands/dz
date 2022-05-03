@@ -7,7 +7,7 @@
 fix_connectivity(inst, zones, available_nodes = integer())
 }
 \arguments{
-\item{zones}{}
+\item{available_nodes}{}
 }
 \value{
 

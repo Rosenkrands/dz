@@ -7,7 +7,7 @@
 \method{plot}{rb_clustering}(rb_clust)
 }
 \arguments{
-\item{inst}{}
+\item{rb_clust}{}
 }
 \value{
 
