@@ -1,5 +1,5 @@
 library(dz)
-# set.seed(1)
+set.seed(3)
 
 # setup the initial variables and clustering
 inst <- test_instances$p7_chao
@@ -137,6 +137,7 @@ score <- p_inst$points$score
 expected_score <- p_inst$points$expected_score
 realized_score <- p_inst$points$realized_score
 unexpected <- p_inst$points$unexpected
+candidate_outside <- 0
 plot_progress()
 
 while (length(remaining_route) != 0) {
@@ -146,15 +147,6 @@ while (length(remaining_route) != 0) {
   score[id_now] <- 0; realized_score[id_now] <- 0
 
   # update expected score
-  id_now = 1
-  related_nodes <- which(info[id_now,] != 0)
-  for (i in related_nodes) {
-    inst$points$expected_score[i] <- inst$points$expected_score[i] - inst$points$p_unexpected[i] * info[i,j]
-    if (inst$points$unexpected[id_now]) {
-      inst$points$expected_score[i] <- inst$points$expected_score[i] + info[i,j]
-    }
-  }
-
   if (unexpected[id_now]) { cat("unexpected observation at id_now, updating expected scores\n")
     related_nodes <- which(info[id_now,] != 0) # find the nodes that are related
     for (id in related_nodes) { # update score for related nodes
@@ -165,34 +157,43 @@ while (length(remaining_route) != 0) {
     unexpected[id_now] <- F
   }
 
-  # calculate SDR for neighbors
-  all_nghbrs <- igraph::neighborhood(sub_g, order = 1, nodes = as.character(id_now))[[1]] |>
-    names() |> as.integer()
-  # nghbrs <- all_nghbrs[(all_nghbrs != id_now) & (!all_nghbrs %in% route)] # remove id_now and nodes already visited
-  nghbrs <- all_nghbrs[(all_nghbrs != id_now) & ((!all_nghbrs %in% route) | (all_nghbrs %in% remaining_route))] # remove id_now and nodes already visited
+  find_best_candidate <- function(sub_g, sub_dst) {
+    # calculate SDR for neighbors
+    all_nghbrs <- igraph::neighborhood(sub_g, order = 1, nodes = as.character(id_now))[[1]] |>
+      names() |> as.integer()
+    # nghbrs <- all_nghbrs[(all_nghbrs != id_now) & (!all_nghbrs %in% route)] # remove id_now and nodes already visited
+    nghbrs <- all_nghbrs[(all_nghbrs != id_now) & ((!all_nghbrs %in% route) | (all_nghbrs %in% remaining_route))] # remove id_now and nodes already visited
 
-  # which neigbors can feasibly replace remaining_route[1]
-  L_removed <- sub_dst[as.character(id_now), as.character(remaining_route[1])] +
-               sub_dst[as.character(remaining_route[1]), as.character(remaining_route[2])]
-  L_added <- sub_dst[as.character(id_now), as.character(nghbrs)] +
-             sub_dst[as.character(nghbrs), as.character(remaining_route[2])]
-  delta <- L_added - L_removed
-  L_added <- L_added[delta < L_remaining] # L_added now only contain feasible nodes
+    # which neigbors can feasibly replace remaining_route[1]
+    L_removed <- sub_dst[as.character(id_now), as.character(remaining_route[1])] +
+                 sub_dst[as.character(remaining_route[1]), as.character(remaining_route[2])]
+    L_added <- sub_dst[as.character(id_now), as.character(nghbrs)] +
+               sub_dst[as.character(nghbrs), as.character(remaining_route[2])]
+    delta <- L_added - L_removed
+    L_added <- L_added[delta < L_remaining] # L_added now only contain feasible nodes
 
-  if (length(nghbrs) == 1) {names(L_added) <- nghbrs} # Add names to L_added if length is one
+    if (length(nghbrs) == 1) {names(L_added) <- nghbrs} # Add names to L_added if length is one
 
-  feasible_nghbrs <- nghbrs[nghbrs %in% as.integer(names(L_added))]
+    feasible_nghbrs <- nghbrs[nghbrs %in% as.integer(names(L_added))]
 
-  temp_score <- sapply(feasible_nghbrs, function(nghbr){
-    temp_path <- sp(as.character(nghbr), remaining_route[2], g = sub_g)
-    ids <- c(nghbr, temp_path[-length(temp_path)]) # remove remaining_route[2]
-    sum(score[ids])
-  })
+    temp_score <- sapply(feasible_nghbrs, function(nghbr){
+      temp_path <- sp(as.character(nghbr), remaining_route[2], g = sub_g)
+      ids <- c(nghbr, temp_path[-length(temp_path)]) # remove remaining_route[2]
+      sum(score[ids])
+    })
 
-  sdr <- temp_score / L_added
-  # sdr[!is.finite(sdr)] <- 0
+    sdr <- temp_score / L_added
+    # sdr[!is.finite(sdr)] <- 0
 
-  best_candidate <- as.integer(names(which.max(sdr)))
+    best_candidate <- as.integer(names(which.max(sdr)))
+    return(best_candidate)
+  }
+
+  if (!find_best_candidate(inst$g, inst$dst) %in% zones[[zone_id]]) {
+    candidate_outside <- candidate_outside + 1
+  }
+
+  best_candidate <- find_best_candidate(sub_g, sub_dst)
 
   if (best_candidate %in% remaining_route) {best_candidate <- remaining_route[1]}
 
@@ -219,3 +220,8 @@ while (length(remaining_route) != 0) {
   }
 }
 
+plot_progress()
+
+sum(p_inst$points$realized_score[unique(route)])
+candidate_outside
+route
