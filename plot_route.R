@@ -41,5 +41,5 @@ plot_route <- function(init_route) {
     ggplot2::labs(x = "", y = "")
 }
 
-plot_route(c(1,40,31,30,1))
+plot_route(c(1,40,31,30,7,2,1))
 ggsave("placeholder_for_name.pdf", width = 4, height = 4)
