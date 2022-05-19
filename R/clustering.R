@@ -14,12 +14,13 @@
 #' @return A list ...
 #' @export
 #'
-clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
+clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
   # inst = test_instances$p7_chao; k = 5; L = 40; eps = 0; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 0; info <- generate_information(inst, r = 100)
 
-  inst$points <- inst$points |>
-    dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
+  # Already joined with the variances
+  # inst$points <- inst$points |>
+    # dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
 
   g <- inst$g
   dst <- inst$dst
@@ -132,8 +133,8 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
         in_points$id # Point ids that are in range
       )
 
-      abs_info_same_zone <- sum(abs(info[zone, zone]))
-      abs_info_other_zone <- sum(abs(info[zone,other_zone]))
+      abs_info_same_zone <- sum(abs(inst$info[zone, zone]))
+      abs_info_other_zone <- sum(abs(inst$info[zone,other_zone]))
 
       return(-abs_info_same_zone)
     }
