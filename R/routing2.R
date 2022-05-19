@@ -9,7 +9,7 @@
 #'
 starting_routes <- function(inst, zones, L) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; L = 200; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20);p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones
+  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20);p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones
 
   # Join zones on instance
   all_points <- inst$points |>
@@ -179,7 +179,7 @@ starting_routes <- function(inst, zones, L) {
           # }
           i = 1
           while (i %in% (1:(length(route)-3))) {
-            if (is.na(route[i+3])) {
+            if (is.na(route[i+3]) | is.na(route[i+2])) {
               break
             }
             if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
@@ -428,7 +428,7 @@ starting_routes <- function(inst, zones, L) {
       "initial_routes" = lapply(initial_routes, function(x) x$route),
       "improved_routes" = lapply(improved_routes, function(x) x$route),
       "L_remaining" = lapply(improved_routes, function(x) x$L_remaining),
-      "s_total" = lapply(initial_routes, function(x) x$s_total),
+      "total_score" = lapply(improved_routes, function(x) sum(inst$points$score[unique(x$route)])),
       "zones" = zones,
       "L" = L
     ),
@@ -500,10 +500,14 @@ plot.starting_routes <- function(sr, inst) {
     ggplot2::guides(
       shape = "none",
       fill = "none",
-      color = "none",
+      # color = "none",
       alpha = "none",
       size = "none"
-    )
+    ) +
+    ggplot2::labs(
+      color = "Zone"
+    ) +
+    ggplot2::coord_fixed()
 }
 
 # inst = test_instances$p7_chao; L = 100; k = 3

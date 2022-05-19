@@ -9,14 +9,37 @@
 #' @return a list containing the `hclust` object and a vector of the clusters
 #' @export
 #'
-route_clustering <- function(p_inst, init_routes, k, measure = "position-based", weigthed = T) {
-  if (measure == "element-based") {
-    compute_dissimilarity <- function(i,j) {
+route_clustering <- function(p_inst, init_routes, k, measure = "position-based", weigthed = T, order_preserving = F) {
+  # dissimilarity functions
+  compute_dissimilarity <- function(i,j) {
       nodes_i <- unique(init_routes[[i]]$route)
       nodes_j <- unique(init_routes[[j]]$route)
       difference <- setdiff(nodes_i, nodes_j)
       return(length(difference))
     }
+  position_dissimilarity <- function(ids) {
+      # Determine the longest route
+      routes <- list(init_routes[[ids[1]]]$route, init_routes[[ids[2]]]$route)
+      longest_route <- do.call(c, lapply(routes, length)) |> which.max()
+
+      if (!order_preserving) {
+        mean_dist <- sapply(
+          routes[[longest_route]],
+          function(node_id) {
+            p_inst$dst[node_id, unique(routes[-longest_route][[1]])] |> min()
+          }
+        ) |> mean()
+      } else {
+        stop("Order preserving not implemented")
+      }
+
+      # beta determines if the realized score of the two routes are close to each other
+      beta <- 1/abs((init_routes[[ids[1]]]$realized_score - init_routes[[ids[2]]]$realized_score))
+
+      return(c("mean_dist" = mean_dist, "beta" = beta))
+    }
+
+  if (measure == "element-based") {
 
     n <- length(init_routes)
     dissimilarity <- matrix(nrow = n, ncol = n)
@@ -26,23 +49,6 @@ route_clustering <- function(p_inst, init_routes, k, measure = "position-based",
       }
     }
   } else if (measure == "position-based") {
-    position_dissimilarity <- function(ids) {
-      # Determine the longest route
-      routes <- list(init_routes[[ids[1]]]$route, init_routes[[ids[2]]]$route)
-      longest_route <- do.call(c, lapply(routes, length)) |> which.max()
-
-      mean_dist <- sapply(
-        routes[[longest_route]],
-        function(node_id) {
-          p_inst$dst[node_id, unique(routes[-longest_route][[1]])] |> min()
-        }
-      ) |> mean()
-
-      # beta determines if the realized score of the two routes are close to each other
-      beta <- 1/abs((init_routes[[ids[1]]]$realized_score - init_routes[[ids[2]]]$realized_score))
-
-      return(c("mean_dist" = mean_dist, "beta" = beta))
-    }
 
     # find all combinations of routes and compute dissimilarity
     combinations <- utils::combn(1:length(init_routes), 2, simplify = F)
@@ -290,13 +296,13 @@ fix_connectivity <- function(inst, zones, available_nodes = integer()) {
 #' @return
 #' @export
 #'
-rb_clustering <- function(p_inst, L, k, num_routes, info, dispute_obj = "most_frequent", measure = "position-based", weigthed = T,  shiny = F) {
+rb_clustering <- function(p_inst, L, k, num_routes, info, top_percentile = .15,  dispute_obj = "most_frequent", measure = "position-based", weigthed = T,  shiny = F) {
   # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); p_inst <- prepare_instance(inst, variances, info); dispute_obj = "most_frequent"; shiny = F; num_routes = 100; measure = "position-based"; weigthed = T; set.seed(3)
 
   # First we generate the initial routes
   message("Construct the initial routes")
   suppressMessages(
-    init_routes <- 1:num_routes |> as.list() |> pbapply::pblapply(function(x) {if (shiny) shiny::incProgress(amount = 1/num_routes); initial_route2(p_inst, L, info)})
+    init_routes <- 1:num_routes |> as.list() |> pbapply::pblapply(function(x) {if (shiny) shiny::incProgress(amount = 1/num_routes); initial_route2(p_inst, L, info, top_percentile = top_percentile)})
   )
 
   # Then we perform the route clustering
@@ -344,6 +350,10 @@ rb_clustering <- function(p_inst, L, k, num_routes, info, dispute_obj = "most_fr
 
     fc <- fix_connectivity(inst, zones, available_nodes); zones <- fc$zones
   }
+
+  if (any(sapply(zones, function(x) length(x) < 5))) stop("Insufficient number of zones generated or a zone have insufficient number of nodes")
+
+  # if (any(sapply(zones, function(x) identical(x, c(1))))) stop("Insufficient number of zones generated")
 
   structure(
     list(

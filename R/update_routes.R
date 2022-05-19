@@ -133,14 +133,14 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
     candidate_outside <- 0
     # plot_progress()
 
-    while (length(remaining_route) != 0) {
-      id_now <- tail(route, 1); cat("id_now is", id_now, "\n")
+    while (T) {
+      id_now <- tail(route, 1)#; cat("id_now is", id_now, "\n")
 
       # update score
       score[id_now] <- 0; realized_score[id_now] <- 0
 
       # update expected score
-      if (unexpected[id_now]) { cat("unexpected observation at id_now, updating expected scores\n")
+      if (unexpected[id_now]) { #cat("unexpected observation at id_now, updating expected scores\n")
         related_nodes <- which(info[id_now,] != 0) # find the nodes that are related
         for (id in related_nodes) { # update score for related nodes
           if (!id %in% route){ # Only update the scores for unvisited points
@@ -182,7 +182,7 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
         return(best_candidate)
       }
 
-      if (!find_best_candidate(inst$g, inst$dst) %in% zones[[zone_id]]) {
+      if (!find_best_candidate(p_inst$g, p_inst$dst) %in% zones[[zone_id]]) {
         candidate_outside <- candidate_outside + 1
       }
 
@@ -190,7 +190,7 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
 
       if (best_candidate %in% remaining_route) {best_candidate <- remaining_route[1]}
 
-      if (best_candidate == remaining_route[1]) cat("No better candidate found\n")
+      # if (best_candidate == remaining_route[1]) cat("No better candidate found\n")
 
       route <- append(route, best_candidate)
       remaining_route <- c(
@@ -203,8 +203,8 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
 
       # plot_progress()
 
-      if (remaining_route[1] == 1) {
-        id_now <- tail(route, 1); cat("id_now is", id_now, "\n")
+      if ((remaining_route[1] == 1) & (length(remaining_route) == 1)) {
+        id_now <- tail(route, 1)#; cat("id_now is", id_now, "\n")
         score[id_now] <- 0; realized_score[id_now] <- 0
 
         route <- append(route, 1)
@@ -250,7 +250,7 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
 #'
 plot.updated_routes2 <- function(ur, inst) {
   # For testing purposes:
-  # set.seed(1); inst <- test_instances$p7_chao; L <- 100; k <- 4; variances <- generate_variances(inst); info <- generate_information(inst); p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L); ur <- update_routes2(p_inst, zones, L, k, sr, info)
+  # set.seed(1); inst <- test_instances$p7_chao; L <- 340/2; k <- 2; variances <- generate_variances(inst); info <- generate_information(inst); p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L); ur <- update_routes2(p_inst, zones, L, k, sr, info)
 
   temp <- tibble::tibble(id = ur$zones, agent_id = 1:length(ur$zones)) |>
     tidyr::unnest(cols = id)
@@ -314,4 +314,3 @@ plot.updated_routes2 <- function(ur, inst) {
     ) +
     ggplot2::coord_fixed()
 }
-

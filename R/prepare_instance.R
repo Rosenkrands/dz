@@ -46,6 +46,7 @@ prepare_instance <- function(inst, variances, info) {
   # }
 
   inst$points$expected_score[1] <- 0; inst$points$realized_score[1] <- 0
+  inst$info <- info
 
   class(inst) <- "prepared_instance"
   return(inst)
@@ -99,5 +100,6 @@ plot.prepared_instance <- function(p_inst) {
     # Title, theme and legend adjustments
     ggplot2::ggtitle(paste0("Instance: ", p_inst$name)) +
     ggplot2::theme_bw() +
-    ggplot2::guides(size = "none")
+    ggplot2::guides(size = "none") +
+    ggplot2::coord_fixed()
 }
