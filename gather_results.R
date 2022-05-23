@@ -33,10 +33,10 @@ heuristic_best <- best |>
   select(p_inst, k, L)
 
 heuristic_clusters <- pbapply::pblapply(1:nrow(best), function(row_id) {
-  inst <- best$p_inst[[row_id]]; k = best$k[row_id]; L = best$L[row_id]; cluster_method = "greedy"; alpha = 1; eps = 0
+  inst <- best$p_inst[[row_id]]; k = best$k[row_id]; L = best$L[row_id]/k
 
   suppressMessages(
-    clust_ls <- clustering(inst, k, L, eps = 0, variances = NULL, info = NULL, cluster_method = "local_search", alpha = 1)
+    clust_ls <- clustering(inst, k, L, eps = 0, variances = NULL, info = NULL, cluster_method = "local_search")
   )
 
   return(clust_ls)
@@ -76,6 +76,7 @@ heuristic_sr <- pbapply::pblapply(1:nrow(heuristic_best), function(row_id) {
 
 heuristic_best$sr <- lapply(heuristic_sr, function(x) x[[2]])
 heuristic_best <- heuristic_best |>
+  ungroup() |>
   mutate(sr_score = sapply(heuristic_best$sr, function(x) do.call(sum, x$total_score))) |>
   select(p_inst, clust, sr, sr_score, k, L)
 
