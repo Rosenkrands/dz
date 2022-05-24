@@ -14,12 +14,13 @@
 #' @return A list ...
 #' @export
 #'
-clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
+clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
   # inst = test_instances$p7_chao; k = 5; L = 40; eps = 0; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 0; info <- generate_information(inst, r = 100)
 
-  inst$points <- inst$points |>
-    dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
+  # Already joined with the variances
+  # inst$points <- inst$points |>
+    # dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
 
   g <- inst$g
   dst <- inst$dst
@@ -116,10 +117,10 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
       avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)]) # dst_temp is symmetric so we only need the lower triange (or equivalently upper) not including the diagonal (of all zeroes corresponding to all loop edges)
       if (is.na(avg_dist)) avg_dist <- Inf
       total_profit <- sum(inst$points$score[zone], na.rm = T) # get the total profit from the instance table
-      total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
-
-      p <- .05
-      q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
+      # total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
+      #
+      # p <- .05
+      # q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
 
       return(avg_dist/total_profit)
     }
@@ -132,8 +133,8 @@ clustering <- function(inst, k, L, eps, variances, info, cluster_method = c("gre
         in_points$id # Point ids that are in range
       )
 
-      abs_info_same_zone <- sum(abs(info[zone, zone]))
-      abs_info_other_zone <- sum(abs(info[zone,other_zone]))
+      abs_info_same_zone <- sum(abs(inst$info[zone, zone]))
+      abs_info_other_zone <- sum(abs(inst$info[zone,other_zone]))
 
       return(-abs_info_same_zone)
     }
@@ -422,7 +423,7 @@ plot.clustering <- function(clust, delaunay = T) {
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     # Add title, theme and adjustment of guides
-    ggplot2::ggtitle(paste0("Instance: ", clust$instance$name)) +
+    # ggplot2::ggtitle(paste0("Instance: ", clust$instance$name)) +
     ggplot2::theme_bw() +
     ggplot2::guides(
       shape = "none",

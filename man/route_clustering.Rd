@@ -9,7 +9,8 @@ route_clustering(
   init_routes,
   k,
   measure = "position-based",
-  weigthed = T
+  weigthed = T,
+  order_preserving = F
 )
 }
 \arguments{

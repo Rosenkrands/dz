@@ -10,6 +10,7 @@ rb_clustering(
   k,
   num_routes,
   info,
+  top_percentile = 0.15,
   dispute_obj = "most_frequent",
   measure = "position-based",
   weigthed = T,

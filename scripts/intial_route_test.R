@@ -1,11 +1,11 @@
 library(dz)
-set.seed(15)
+set.seed(1)
 
 inst = test_instances$p7_chao
 variances = generate_variances(inst)
 info = generate_information(inst)
 
-L = 100
+L = 50
 
 benchmark_function <- function(num_routes, top_percentile) {
   p_inst = prepare_instance(inst, variances, info)

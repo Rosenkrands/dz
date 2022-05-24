@@ -4,7 +4,7 @@
 \alias{initial_route2}
 \title{Generation of initial routes as part of pre-mission cluster - 2nd edition}
 \usage{
-initial_route2(p_inst, L, info, top_percentile = 0.15)
+initial_route2(p_inst, L, info, top_percentile = 0.5)
 }
 \arguments{
 \item{p_inst}{A list returned from the `prepare_instance` function}

@@ -9,7 +9,7 @@
 #' @return A route satisfying the range constraint, represented as an integer vector
 #' @export
 #'
-initial_route2 <- function(p_inst, L, info, top_percentile = .15) {
+initial_route2 <- function(p_inst, L, info, top_percentile = .5) {
   # For testing purposes:
   # inst <- test_instances$p7_chao;L <- 100;variances <- generate_variances(inst);info <- generate_information(inst);p_inst <- prepare_instance(inst, variances, info)
 
@@ -104,22 +104,19 @@ initial_route2 <- function(p_inst, L, info, top_percentile = .15) {
     score[path_to_next] <- 0
     L_remaining <- L_remaining - dst[current_node, node_id]
 
-    # update expected score
-    related_nodes <- which(info[node_id,] != 0)
-
-    # check if anything was unexpected and update the correlated scores
-    for (i in path_to_next) {
-      related_nodes <- which(info[i,] != 0)
-      for (j in related_nodes) {
-        if (!j %in% route) {
-          expected_score[j] <- expected_score[j] - p_inst$points$p_unexpected[j] * info[i,j]
-          if (unexpected[i]) {
-            expected_score[j] <- expected_score[j] + info[i,j]
-          }
-        }
-      }
-      unexpected[i] <- F
-    }
+    # # check if anything was unexpected and update the correlated scores
+    # for (i in path_to_next) {
+    #   related_nodes <- which(info[i,] != 0)
+    #   for (j in related_nodes) {
+    #     if (!j %in% route) {
+    #       expected_score[j] <- expected_score[j] - p_inst$points$p_unexpected[j] * info[i,j]
+    #       if (unexpected[i]) {
+    #         expected_score[j] <- expected_score[j] + info[i,j]
+    #       }
+    #     }
+    #   }
+    #   unexpected[i] <- F
+    # }
 
     current_node <- tail(route, 1)
   }
@@ -165,8 +162,8 @@ plot.initial_route2 <- function(init_route, p_inst) {
   ggplot2::ggplot() +
     ggplot2::geom_point(
       data = p_inst$points |> dplyr::filter(point_type == "intermediate"),
-      # ggplot2::aes(x, y, size = score, color = score, shape = point_type)
-      ggplot2::aes(x, y, shape = point_type)
+      ggplot2::aes(x, y, size = score, color = score, shape = point_type), alpha = .7
+      # ggplot2::aes(x, y, shape = point_type)
     ) +
     ggplot2::geom_segment(
       data = p_inst$edges,
@@ -183,5 +180,6 @@ plot.initial_route2 <- function(init_route, p_inst) {
     ) +
     ggplot2::ggtitle(paste0("Instance: ", p_inst$name)) +
     ggplot2::theme_bw() +
-    ggplot2::guides(shape = "none", size = "none")
+    ggplot2::guides(shape = "none", size = "none") +
+    ggplot2::coord_fixed()
 }
