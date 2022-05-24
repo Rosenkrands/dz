@@ -163,7 +163,7 @@ starting_routes <- function(inst, zones, L) {
         map[New_last,]$score <- 0
         # print(New_last)
       }
-      while ((dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g)) > L_remaining){ # if there is not enough range to visit new last check the next one
+      while ((dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g)) > L_remaining){ # if there is not enough range to visit new last, then check the next one
         SDR[New_last] <- 0
         New_last <- which.max(SDR)
         print(New_last)
@@ -172,11 +172,11 @@ starting_routes <- function(inst, zones, L) {
           all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
           route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
           ### Remove duplicate e.g. 1 56 ... 30 1 30 1
-          # for (i in 1:(length(route)-3)) {
-          #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
-          #     route <- route[-i]; route <- route[-i]
-          #   }
-          # }
+          for (i in 1:(length(route)-3)) {
+            if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
+              route <- route[-i]; route <- route[-i]
+            }
+          }
           i = 1
           while (i %in% (1:(length(route)-3))) {
             if (is.na(route[i+3])) {
@@ -199,23 +199,37 @@ starting_routes <- function(inst, zones, L) {
           return(output)
         }
       }
-      route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
-
+      #HERE
+      route_temp <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
+      print(route)
       # construct route to determine length, including path to the source
-      route_temp <- c(route[-length(route)], dist2(route[length(route) - 1], 1, g = g)[-1])
+      #HERE
+      # route_temp <- c(route[-length(route)], dist2(route[length(route) - 1], 1, g = g)[-1])
       # route_global <- vector(length = length(route_temp))
       # for (i in 1:length(route_temp)){
       #   route_global[i] <- lookup$id[route_temp[i]]
       # }
+      #HERE
       L_remaining <- L - route_length(route = route_temp, g = g)
-      while (L_remaining < 0) {
-        # route[-(length(route)-1)]
-        route_temp <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
-        L_remaining <- L - route_length(route = route_temp, g = g)
-        SDR <- rep(0, length(SDR))
-        print(route_temp)
-        route <- route_temp
+      if(L_remaining < 0) {
+        route_global <- vector(length = length(route))
+        for (i in 1:length(route)){
+          route_global[i] <- lookup$id[route[i]]
+          output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+        }
+        return(output)
+      } else {
+        route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
       }
+      # while (L_remaining < 0) {
+      #   # route[-(length(route)-1)]
+      #   route_temp <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
+      #   L_remaining <- L - route_length(route = route_temp, g = g)
+      #   SDR <- rep(0, length(SDR))
+      #   print(route_temp)
+      #   route <- route_temp
+      # }
+
       # print(route)
       # if (L_remaining < 50) {
         # route_global <- vector(length = length(route))
@@ -226,40 +240,42 @@ starting_routes <- function(inst, zones, L) {
       #   return(output)
       # }
       # print(SDR)
-      if (max(SDR) == 0){
-        # If last before source is not directly connected to source
-        if (length((dist2(route[(length(route)-1)], route[length(route)], g = g))) > 2) {
-          # Connect them if L_remaining allows it, otherwise remove some of the route
-          if (route_length(route = route, g = g) <= L){
-            # Add shortest path to source to "route"
-            sp_last <- dist2(route[(length(route)-1)], route[length(route)], g = g)
-            route <- append(route, sp_last[2:(length(sp_last)-1)], after = (length(route)-1))
-            # Make sure we return after this
-            # SDR <- rep(0, length(SDR))
-          } else {
-            while (route_length(route = route, g = g) > L) {
-              # Remove last in route
-              route <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
-              L_remaining <- L - route_length(route = route_temp, g = g)
-            }
-            sp_last <- dist2(route[(length(route)-1)], route[length(route)], g = g)
-            route <- append(route, sp_last[2:(length(sp_last)-1)], after = (length(route)-1))
-            # SDR <- rep(0, length(SDR))
-          }
-        }
-        route_global <- vector(length = length(route))
-        for (i in 1:length(route)){
-          route_global[i] <- lookup$id[route[i]]
-        }
-        ### Remove duplicate e.g. 1 56 ... 30 1 30 1
-        for (i in (length(route_global)-3)) {
-          if (route_global[i] == route_global[i+2] & route_global[i+1] == route_global[i+3]) {
-            route_global <- route_global[-i]; route_global <- route_global[-i]
-          }
-        }
-        output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
-        return(output)
-      }
+      #HERE
+      # if (max(SDR) == 0){
+      #   # If last before source is not directly connected to source
+      #   if (length((dist2(route[(length(route)-1)], route[length(route)], g = g))) > 2) {
+      #     # Connect them if L_remaining allows it, otherwise remove some of the route
+      #     if (route_length(route = route, g = g) <= L){
+      #       # Add shortest path to source to "route"
+      #       sp_last <- dist2(route[(length(route)-1)], route[length(route)], g = g)
+      #       route <- append(route, sp_last[2:(length(sp_last)-1)], after = (length(route)-1))
+      #       # Make sure we return after this
+      #       # SDR <- rep(0, length(SDR))
+      #     } else {
+      #       while (route_length(route = route, g = g) > L) {
+      #         # Remove last in route
+      #         route <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
+      #         L_remaining <- L - route_length(route = route_temp, g = g)
+      #       }
+      #       sp_last <- dist2(route[(length(route)-1)], route[length(route)], g = g)
+      #       route <- append(route, sp_last[2:(length(sp_last)-1)], after = (length(route)-1))
+      #       # SDR <- rep(0, length(SDR))
+      #     }
+      #   }
+      #   route_global <- vector(length = length(route))
+      #   for (i in 1:length(route)){
+      #     route_global[i] <- lookup$id[route[i]]
+      #   }
+      #   ### Remove duplicate e.g. 1 56 ... 30 1 30 1
+      #   #HERE
+      #   # for (i in (length(route_global)-3)) {
+      #   #   if (route_global[i] == route_global[i+2] & route_global[i+1] == route_global[i+3]) {
+      #   #     route_global <- route_global[-i]; route_global <- route_global[-i]
+      #   #   }
+      #   # }
+      #   output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+      #   return(output)
+      # }
     }
   }
 
