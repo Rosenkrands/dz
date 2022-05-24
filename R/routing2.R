@@ -495,7 +495,7 @@ plot.starting_routes <- function(sr, inst) {
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     # ggplot2::scale_color_manual(values = c("black", scales::hue_pal()(k))) +
-    ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
+    # ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
     ggplot2::theme_bw() +
     ggplot2::guides(
       shape = "none",
@@ -505,7 +505,7 @@ plot.starting_routes <- function(sr, inst) {
       size = "none"
     ) +
     ggplot2::labs(
-      color = "Zone"
+      color = "Zone", x = "x", y = "y"
     ) +
     ggplot2::coord_fixed()
 }
