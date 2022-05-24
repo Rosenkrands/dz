@@ -163,13 +163,13 @@ routing_results <- tibble::tibble(agent_id = 1:clust$k)
 # Caclculate the routes
 rslt <- lapply(
   routing_results$agent_id,
-  function(zone_id) {solve_routing(obj = "SDR", L = 500, zone_id = zone_id)}
+  function(zone_id) {solve_routing(obj = "SDR", L = 150, zone_id = zone_id)}
 )
 
 # then we gather results from the k routes into one data structure
 route_list <- lapply(
   rslt,
-  function(arg) {arg$lookup$id[arg$route]} # convert from local_id to id
+  function(arg) {arg$route} # convert from local_id to id
 )
 
 routing_results$routes <- route_list
