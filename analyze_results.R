@@ -1,5 +1,6 @@
 library(dz)
 library(tidyverse)
+library(xtable)
 
 combined_results <- readRDS("combined_results.rds")
 
@@ -79,7 +80,8 @@ ur_data <- combined_results |>
   unnest(cols = ur_score) |>
   select(-scenarios)
 
-summary(lm(ur_score ~ clustering_method, data = ur_data |> filter(k == 2)))
+sum_score <- summary(lm(ur_score ~ clustering_method, data = ur_data))
+xtable(sum_score)
 summary(lm(ur_score ~ clustering_method, data = ur_data |> filter(k == 3)))
 summary(lm(ur_score ~ clustering_method, data = ur_data |> filter(k == 3, L < 300)))
 summary(lm(ur_score ~ clustering_method, data = ur_data |> filter(k == 4)))
@@ -96,12 +98,14 @@ cu_data <- combined_results |>
   unnest(cols = cu) |>
   select(-scenarios)
 
-summary(lm(cu ~ clustering_method, data = cu_data |> filter(k == 2)))
+sum_cu <- summary(lm(cu ~ clustering_method, data = cu_data))
+xtable(sum_cu)
 summary(lm(cu ~ clustering_method, data = cu_data |> filter(k == 3)))
 summary(lm(cu ~ clustering_method, data = cu_data |> filter(k == 4)))
-summary(lm(cu ~ clustering_method, data = cu_data |> filter(k == 2, L <= 300)))
+sum_cu_300 <- summary(lm(cu ~ clustering_method, data = cu_data |> filter(L < 300)))
+xtable(sum_cu_300)
 summary(lm(cu ~ clustering_method, data = cu_data |> filter(k == 3, L <= 300)))
-summary(lm(cu ~ clustering_method, data = cu_data |> filter(k == 4, L <= 300)))
+summary(lm(cu ~ clustering_method, data = cu_data |> filter(k == 4, L < 300)))
 summary(lm(cu ~ clustering_method, data = cu_data))
 
 # Comparison of clustering method by mean number of candidates outside the zone
