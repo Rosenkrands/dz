@@ -1,7 +1,7 @@
 library(dz)
 library(tidyverse)
 
-combined_results <- readRDS("C:/Users/krose/Desktop/combined_results.rds")
+combined_results <- readRDS("combined_results.rds")
 
 combined_results <- combined_results |>
   mutate(mean_ur_score = sapply(ur_score, mean),
