@@ -23,6 +23,8 @@ library(tidyverse)
 #          sr = `list(sr)`)
 
 rslt <- readRDS("./rslt_new_sr.rds")
+rslt <- rslt |>
+  mutate(sr_score = sapply(rslt$sr, function(x) do.call(sum, x$total_score)))
 
 message("Finding the best zones with best starting routes...")
 best <- rslt |>
