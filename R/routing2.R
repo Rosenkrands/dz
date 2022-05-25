@@ -117,7 +117,7 @@ starting_routes <- function(inst, zones, L) {
     route <- append(route, 1)
     s_total <- 0
     while (L_remaining > 0) {
-      # print(lookup$id[route])
+      # if (tail(route, 2) == c(40,1)) stop()
       if (obj == 'SDR'){
         d <- vector(length = length(map$id))
         s <- vector(length = length(map$id))
@@ -137,7 +137,8 @@ starting_routes <- function(inst, zones, L) {
           sp1_nodes <- dist2(route[length(route)-1], candidates[i], g = g)
           sp2_nodes <- dist2(candidates[i], 1, g = g)
           s_path <- c(sp1_nodes, sp2_nodes[2:(length(sp2_nodes))])
-          s[i] <- sum(map$score[unique(s_path)])
+          # s[i] <- sum(map$score[unique(s_path)]) # consider score to New_last and back to base
+          s[i] <- sum(map$score[unique(sp1_nodes)]) # consider only score to New_last, disregard path to base
           # s[i] <- map[candidates[i],]$score
           SDR[i] <- s[i]/d[i]
           SDR[1] <- 0
@@ -212,6 +213,7 @@ starting_routes <- function(inst, zones, L) {
       #HERE
       L_remaining <- L - route_length(route = route_temp, g = g)
       if(L_remaining < 0) {
+        L_remaining <- L - route_length(route = route, g = g)
         route_global <- vector(length = length(route))
         for (i in 1:length(route)){
           route_global[i] <- lookup$id[route[i]]

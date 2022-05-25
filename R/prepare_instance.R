@@ -84,8 +84,12 @@ plot.prepared_instance <- function(p_inst) {
     ) +
     # Draw the intermediate nodes
     ggplot2::geom_point(
-      data = p_inst$points |> dplyr::filter(point_type == "intermediate"),
-      ggplot2::aes(x, y, size = score, color = score, alpha = score_variance)
+      data = p_inst$points |> dplyr::filter(point_type == "intermediate", unexpected == F),
+      ggplot2::aes(x, y, size = score, color = score)
+    ) +
+    ggplot2::geom_point(
+      data = p_inst$points |> dplyr::filter(point_type == "intermediate", unexpected == T),
+      ggplot2::aes(x, y, size = score, color = score), shape = 1
     ) +
     # Draw a cross on intermediate nodes that have an unexpected observation
     ggplot2::geom_point(
@@ -98,7 +102,7 @@ plot.prepared_instance <- function(p_inst) {
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     # Title, theme and legend adjustments
-    ggplot2::ggtitle(paste0("Instance: ", p_inst$name)) +
+    # ggplot2::ggtitle(paste0("Instance: ", p_inst$name)) +
     ggplot2::theme_bw() +
     ggplot2::guides(size = "none") +
     ggplot2::coord_fixed()

@@ -90,9 +90,9 @@ plot.instance <- function(inst, delaunay = T) {
       data = inst$points |> dplyr::filter(point_type == "terminal"),
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
-    ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
+    # ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
     ggplot2::theme_bw() +
-    ggplot2::guides(shape = "none", size = "none")
+    ggplot2::guides(shape = "none", size = "none") + ggplot2::labs(x = "x", y = "y")
 
   return(p)
 }

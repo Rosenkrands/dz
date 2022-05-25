@@ -128,6 +128,8 @@ clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c(
     relevancy <- function(zone) {
       # find the absolute correlation between points in the zone
       # other_zone <- in_points$id[-zone]
+      if (identical(zone, c(1))) return(Inf)
+
       other_zone <- intersect(
         inst$points$id[-zone], # All points ids that are not the zone
         in_points$id # Point ids that are in range
@@ -415,7 +417,7 @@ plot.clustering <- function(clust, delaunay = T) {
       data = clust$instance$points |>
         dplyr::filter(point_type == "intermediate") |>
         dplyr::mutate(zone = factor(zone)),
-      ggplot2::aes(x, y, color = zone, size = score, alpha = score_variance)
+      ggplot2::aes(x, y, color = zone, size = score)
     ) +
     # Plot the terminal nodes
     ggplot2::geom_point(
@@ -431,7 +433,7 @@ plot.clustering <- function(clust, delaunay = T) {
       color = "none",
       alpha = "none",
       size = "none"
-    )
+    ) + labs(x = "x", y = "y")
 }
 
 #' Generate animation of the local search clustering approach
