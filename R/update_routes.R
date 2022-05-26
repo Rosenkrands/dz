@@ -300,7 +300,7 @@ plot.updated_routes2 <- function(ur, inst) {
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     # ggplot2::scale_color_manual(values = c("black", scales::hue_pal()(k))) +
-    ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
+    # ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
     ggplot2::theme_bw() +
     ggplot2::guides(
       shape = "none",
