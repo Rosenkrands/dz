@@ -586,3 +586,4 @@ nz_sr <- pbapply::pblapply(1:nrow(params), function(i) {
 
 saveRDS(nz_sr, "nz_sr.rds")
 
+# TODO: use ur_scenario function and record realized scores for no zone starting routes
