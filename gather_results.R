@@ -24,7 +24,7 @@ library(tidyverse)
 
 rslt <- readRDS("./rslt_new_sr.rds")
 rslt <- rslt |>
-  mutate(sr_score = sapply(rslt$sr, function(x) do.call(sum, x$total_score)))
+  mutate(sr_score = sapply(seq_along(rslt$sr), function(i) {print(i); do.call(sum, rslt$sr[[i]]$total_score)}))
 
 message("Finding the best zones with best starting routes...")
 best <- rslt |>
@@ -80,7 +80,8 @@ heuristic_sr <- pbapply::pblapply(1:nrow(heuristic_best), function(row_id) {
 heuristic_best$sr <- lapply(heuristic_sr, function(x) x[[2]])
 heuristic_best <- heuristic_best |>
   ungroup() |>
-  mutate(sr_score = sapply(heuristic_best$sr, function(x) do.call(sum, x$total_score))) |>
+  # mutate(sr_score = sapply(heuristic_best$sr, function(x) do.call(sum, x$total_score))) |>
+  mutate(sr_score = sapply(seq_along(heuristic_best$sr), function(i) {print(i); try(do.call(sum, heuristic_best$sr[[i]]$total_score))})) |>
   select(p_inst, clust, sr, sr_score, k, L)
 
 # best_sr <- pbapply::pblapply(1:nrow(best), function(row_id) {

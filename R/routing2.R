@@ -117,7 +117,7 @@ starting_routes <- function(inst, zones, L) {
     route <- append(route, 1)
     s_total <- 0
     while (L_remaining > 0) {
-      # if (tail(route, 2) == c(15,1)) stop()
+      # if (tail(route, 2) == c(11,1)) stop()
       if (obj == 'SDR'){
         d <- vector(length = length(map$id))
         s <- vector(length = length(map$id))
@@ -148,6 +148,36 @@ starting_routes <- function(inst, zones, L) {
         }
 
         New_last <- which.max(SDR)
+        if (New_last == 1) {
+          all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
+          route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
+          ### Remove duplicate e.g. 1 56 ... 30 1 30 1
+          # for (i in 1:(length(route)-3)) {
+          #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
+          #     route <- route[-i]; route <- route[-i]
+          #   }
+          # }
+          i = 1
+          while (i %in% (1:(length(route)-3))) {
+            if (is.na(route[i+3]) | is.na(route[i+2])) {
+              break
+            }
+            if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
+              route <- route[-i]; route <- route[-i]
+              i = i - 2
+            }
+            i = i + 1
+          }
+          route_global <- vector(length = length(route))
+          for (i in 1:length(route)){
+            route_global[i] <- lookup$id[route[i]]
+          }
+          L_remaining <- L - route_length(route = route, g = g)
+          # Function to plot path using information in route object
+          output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+          print(route)
+          return(output)
+        }
         sp1_nodes_g <- dist2(route[length(route)-1], New_last, g = g)
         sp2_nodes_g <- dist2(New_last, 1, g = g)
         s_path_g <- c(sp1_nodes_g, sp2_nodes_g[2:(length(sp2_nodes_g))])
@@ -178,11 +208,11 @@ starting_routes <- function(inst, zones, L) {
           all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
           route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
           ### Remove duplicate e.g. 1 56 ... 30 1 30 1
-          for (i in 1:(length(route)-3)) {
-            if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
-              route <- route[-i]; route <- route[-i]
-            }
-          }
+          # for (i in 1:(length(route)-3)) {
+          #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
+          #     route <- route[-i]; route <- route[-i]
+          #   }
+          # }
           i = 1
           while (i %in% (1:(length(route)-3))) {
             if (is.na(route[i+3]) | is.na(route[i+2])) {
@@ -342,6 +372,15 @@ starting_routes <- function(inst, zones, L) {
     map$score[route] <- 0
 
     candidates <- map$local_id[!(map$local_id) %in% route]
+    if (length(candidates) == 0) {
+      route_global <- vector(length = length(route))
+      for (i in 1:length(route)){
+        route_global[i] <- lookup$id[route[i]]
+      }
+      L_remaining <- L - route_length(route = route, g = g)
+      output <- list("route" = route_global, "L_remaining" = L_remaining, "delsgs" = delsgs, "lookup" = lookup)
+      return(output)
+    }
     # last_in_current <- route[length(route)]
     s_total <- 0
 
