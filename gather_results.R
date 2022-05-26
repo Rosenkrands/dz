@@ -1,27 +1,30 @@
 library(dz)
 library(tidyverse)
 
-results_direc <- "C:/Users/krose/Desktop/experiment results 0dot5"
+# results_direc <- "C:/Users/krose/Desktop/experiment results 0dot5"
+#
+# load_results_files <- function(direc) {
+#   pbapply::pblapply(
+#     list.files(direc, full.names = T),
+#     function(x) readRDS(x)
+#   )
+# }
+#
+# message("Loading results files...")
+# rslt <- do.call(bind_rows, load_results_files(results_direc)) |>
+#   select(-`list(ur)`)
+#
+# rslt <- rslt |>
+#   mutate(sr_score = sapply(rslt$`list(sr)`, function(x) do.call(sum, x$total_score)),
+#          k = sapply(rslt$`list(sr)`, function(x) length(x$zones)),
+#          L = sapply(rslt$`list(sr)`, function(x) x$L * length(x$zones))) |>
+#   rename(p_inst = `list(p_inst)`,
+#          clust = `list(rb_clust)`,
+#          sr = `list(sr)`)
 
-load_results_files <- function(direc) {
-  pbapply::pblapply(
-    list.files(direc, full.names = T),
-    function(x) readRDS(x)
-  )
-}
-
-message("Loading results files...")
-rslt <- do.call(bind_rows, load_results_files(results_direc)) |>
-  select(-`list(ur)`)
-
+rslt <- readRDS("./rslt_new_sr.rds")
 rslt <- rslt |>
-  mutate(sr_score = sapply(rslt$`list(sr)`, function(x) do.call(sum, x$total_score)),
-         k = sapply(rslt$`list(sr)`, function(x) length(x$zones)),
-         L = sapply(rslt$`list(sr)`, function(x) x$L * length(x$zones))) |>
-  rename(p_inst = `list(p_inst)`,
-         clust = `list(rb_clust)`,
-         sr = `list(sr)`)
-
+  mutate(sr_score = sapply(rslt$sr, function(x) do.call(sum, x$total_score)))
 
 message("Finding the best zones with best starting routes...")
 best <- rslt |>
@@ -33,10 +36,10 @@ heuristic_best <- best |>
   select(p_inst, k, L)
 
 heuristic_clusters <- pbapply::pblapply(1:nrow(best), function(row_id) {
-  inst <- best$p_inst[[row_id]]; k = best$k[row_id]; L = best$L[row_id]/k
+  inst <- best$p_inst[[row_id]]; k = best$k[row_id]; L = best$L[row_id]/k; info = best$p_inst[[row_id]]$info
 
   suppressMessages(
-    clust_ls <- clustering(inst, k, L, eps = 0, variances = NULL, info = NULL, cluster_method = "local_search")
+    clust_ls <- clustering(inst, k, L = L + .25*(200 - L), eps = 0, variances = NULL, info, cluster_method = "local_search", alpha = 1)
   )
 
   return(clust_ls)
@@ -79,6 +82,32 @@ heuristic_best <- heuristic_best |>
   ungroup() |>
   mutate(sr_score = sapply(heuristic_best$sr, function(x) do.call(sum, x$total_score))) |>
   select(p_inst, clust, sr, sr_score, k, L)
+
+# best_sr <- pbapply::pblapply(1:nrow(best), function(row_id) {
+#   error = F
+#   tryCatch(
+#     expr = {
+#       zones <- best$clust[[row_id]]$zones
+#       sr <- starting_routes(
+#         inst = best$p_inst[[row_id]],
+#         zones = zones,
+#         L = best$L[row_id]/length(zones)
+#       )
+#     },
+#     error = function(e) {
+#       print(e); err <<- e; error <<- T
+#     }
+#   )
+#
+#   if (error) {
+#     return(list(row_id, err))
+#   } else {
+#     return(list(row_id, sr))
+#   }
+# }, cl = cl
+# )
+#
+# best$sr <- lapply(best_sr, function(x) x[[2]])
 
 message("Combining heuristic and routing-based into one...")
 combined_rslt <- bind_rows(

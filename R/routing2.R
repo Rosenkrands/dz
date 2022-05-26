@@ -117,7 +117,7 @@ starting_routes <- function(inst, zones, L) {
     route <- append(route, 1)
     s_total <- 0
     while (L_remaining > 0) {
-      # print(lookup$id[route])
+      # if (tail(route, 2) == c(15,1)) stop()
       if (obj == 'SDR'){
         d <- vector(length = length(map$id))
         s <- vector(length = length(map$id))
@@ -137,24 +137,29 @@ starting_routes <- function(inst, zones, L) {
           sp1_nodes <- dist2(route[length(route)-1], candidates[i], g = g)
           sp2_nodes <- dist2(candidates[i], 1, g = g)
           s_path <- c(sp1_nodes, sp2_nodes[2:(length(sp2_nodes))])
-          s[i] <- sum(map$score[unique(s_path)])
+          # s[i] <- sum(map$score[unique(s_path)]) # consider score to New_last and back to base
+          s[i] <- sum(map$score[unique(sp1_nodes)]) # consider only score to New_last, disregard path to base
           # s[i] <- map[candidates[i],]$score
           SDR[i] <- s[i]/d[i]
           SDR[1] <- 0
           SDR[is.na(SDR)] <- 0
-          SDR[!is.finite(SDR)] <- 0
+          # SDR[!is.finite(SDR)] <- 0
+          if ((d[i] <= 0) & (s[i] > 0)) {SDR[i] <- Inf}
         }
+
         New_last <- which.max(SDR)
         sp1_nodes_g <- dist2(route[length(route)-1], New_last, g = g)
         sp2_nodes_g <- dist2(New_last, 1, g = g)
         s_path_g <- c(sp1_nodes_g, sp2_nodes_g[2:(length(sp2_nodes_g))])
         # s_total <- sum(map$score[unique(s_path_g)]) + s_total
         # map$score[unique(s_path_g)] <- 0
-        all_short_path <- dist2(route[length(route)-1], New_last, g = g)
-        for (node in (all_short_path[2:length(all_short_path)])) {
-          s_total <- s_total + map$score[node]
-          map$score[node] <- 0
-        }
+
+        # Moved to below next while loop!
+        # all_short_path <- dist2(route[length(route)-1], New_last, g = g)
+        # for (node in (all_short_path[2:length(all_short_path)])) {
+        #   s_total <- s_total + map$score[node]
+        #   map$score[node] <- 0
+        # }
       }
       if (obj == 'random'){
         New_last <- sample(2:101, size = 1)
@@ -168,6 +173,7 @@ starting_routes <- function(inst, zones, L) {
         New_last <- which.max(SDR)
         print(New_last)
         print(SDR[New_last])
+
         if (SDR[New_last] == 0) {# No SDR candidates can be reached, add route back to base
           all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
           route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
@@ -199,8 +205,15 @@ starting_routes <- function(inst, zones, L) {
           return(output)
         }
       }
-      #HERE
-      route_temp <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
+      all_short_path <- dist2(route[length(route)-1], New_last, g = g)
+      for (node in (all_short_path[2:length(all_short_path)])) {
+        s_total <- s_total + map$score[node]
+        map$score[node] <- 0
+      }
+
+      # route_temp <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
+      route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
+      last_in_current <- route[length(route)-1]
       print(route)
       # construct route to determine length, including path to the source
       #HERE
@@ -210,17 +223,20 @@ starting_routes <- function(inst, zones, L) {
       #   route_global[i] <- lookup$id[route_temp[i]]
       # }
       #HERE
-      L_remaining <- L - route_length(route = route_temp, g = g)
-      if(L_remaining < 0) {
-        route_global <- vector(length = length(route))
-        for (i in 1:length(route)){
-          route_global[i] <- lookup$id[route[i]]
-          output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
-        }
-        return(output)
-      } else {
-        route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
-      }
+
+      L_remaining <- L - route_length(route = route, g = g)
+      # if(L_remaining < 0) {
+      #   print("We are returning because L_remaining < 0")
+      #   L_remaining <- L - route_length(route = route, g = g)
+      #   route_global <- vector(length = length(route))
+      #   for (i in 1:length(route)){
+      #     route_global[i] <- lookup$id[route[i]]
+      #     output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
+      #   }
+      #   return(output)
+      # } else {
+      #   route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
+      # }
       # while (L_remaining < 0) {
       #   # route[-(length(route)-1)]
       #   route_temp <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])

@@ -2,7 +2,11 @@ library(dz)
 library(tidyverse)
 library(xtable)
 
-combined_results <- readRDS("combined_results.rds")
+combined_results <- readRDS("combined_results.rds") |>
+  # filter(clustering_method != "heuristic") |>
+  bind_rows(
+    readRDS("combined_results_relevancy.rds") |> filter(clustering_method == "heuristic relevancy")
+  ) |> ungroup()
 
 combined_results <- combined_results |>
   mutate(mean_ur_score = sapply(ur_score, mean),
@@ -124,17 +128,21 @@ uav_effect_data |>
   ggplot(aes(x = k, y = value, color = clustering_method, linetype = name, group = paste(clustering_method, name))) +
   geom_point(aes(shape = factor(k))) +
   geom_line() +
-  facet_wrap(~clustering_method) +
+  # facet_wrap(~clustering_method) +
   scale_x_continuous(n.breaks = 3) +
   theme_bw()
 
 cowplot::plot_grid(
   plot(uav_effect_data$sr[[1]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
   plot(uav_effect_data$sr[[4]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$sr[[7]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
   plot(uav_effect_data$sr[[2]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
   plot(uav_effect_data$sr[[5]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$sr[[8]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
   plot(uav_effect_data$sr[[3]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
   plot(uav_effect_data$sr[[6]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$sr[[9]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
   nrow = 3
 )
-ggsave("./figures_for_report/compare_clustering_methods_sr.png", width = 9, height = 13.5)
+
+ggsave("./figures_for_report/compare_clustering_methods_sr.png", width = 13.5, height = 13.5)
