@@ -167,3 +167,5 @@ cowplot::plot_grid(
   plot(uav_effect_data$scenarios[[9]][[39]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
   nrow = 3
 )
+
+ggsave("./figures_for_report/compare_clustering_methods_ur.png", width = 13, height = 16.5)
