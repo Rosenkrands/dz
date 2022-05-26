@@ -39,7 +39,7 @@ heuristic_clusters <- pbapply::pblapply(1:nrow(best), function(row_id) {
   inst <- best$p_inst[[row_id]]; k = best$k[row_id]; L = best$L[row_id]/k; info = best$p_inst[[row_id]]$info
 
   suppressMessages(
-    clust_ls <- clustering(inst, k, L = L + .25*(200 - L), eps = 0, variances = NULL, info, cluster_method = "local_search", alpha = 1)
+    clust_ls <- clustering(inst, k, L = L + .25*(200 - L), eps = 0, variances = NULL, info, cluster_method = "local_search", alpha = 0)
   )
 
   return(clust_ls)
@@ -113,7 +113,7 @@ heuristic_best <- heuristic_best |>
 message("Combining heuristic and routing-based into one...")
 combined_rslt <- bind_rows(
   best |> mutate(clustering_method = "routing-based"),
-  heuristic_best |> mutate(clustering_method = "heuristic")
+  heuristic_best |> mutate(clustering_method = "heuristic relevancy")
 )
 
 message("Simulating scenarios...")
@@ -208,4 +208,4 @@ combined_rslt$candidate_outside <- lapply(
 )
 
 message("Saving combined results...")
-saveRDS(combined_rslt, file = "C:/Users/krose/Desktop/combined_results.rds")
+saveRDS(combined_rslt, file = "C:/Users/krose/Desktop/combined_results_relevancy.rds")
