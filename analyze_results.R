@@ -12,7 +12,9 @@ combined_results <- combined_results |>
   mutate(mean_ur_score = sapply(ur_score, mean),
          median_ur_score = sapply(ur_score, median),
          mean_candidate_outside = sapply(candidate_outside, mean)) |>
-  select(clustering_method, k, L, sr_score, mean_ur_score, median_ur_score, mean_candidate_outside, p_inst, clust, sr, scenarios, ur_score, candidate_outside)
+  select(clustering_method, k, L, sr_score, mean_ur_score, median_ur_score, mean_candidate_outside, p_inst, clust, sr, scenarios, ur_score, candidate_outside) |>
+  mutate(clustering_method = factor(clustering_method, levels = c("routing-based", "heuristic", "heuristic relevancy"),
+                                    labels = c("RB", "HC", "HR")))
 
 # Comparison of clustering method by sr_score
 combined_results |>
@@ -28,7 +30,7 @@ combined_results |>
                       shape = "Solution method") +
     theme(legend.position = "top")
 
-ggsave("./figures_for_report/starting_routes.pdf", width = 8, height = 3)
+ggsave("./figures_for_report/starting_routes.pdf", width = 8, height = 3.5)
 
 # Comparison of clustering method by mean_ur_score
 combined_results |>
@@ -44,7 +46,7 @@ combined_results |>
                       shape = "Solution method") +
     theme(legend.position = "top")
 
-ggsave("./figures_for_report/updated_routes.pdf", width = 8, height = 3)
+ggsave("./figures_for_report/updated_routes.pdf", width = 8, height = 3.5)
 
 # Comparison of clustering method by mean_ur_score
 combined_results |>
@@ -71,7 +73,7 @@ combined_results |>
                     shape = "Solution method") +
   theme(legend.position = "top")
 
-ggsave("./figures_for_report/updated_routes_w_more_points.pdf", width = 8, height = 4)
+ggsave("./figures_for_report/updated_routes_w_more_points.pdf", width = 8, height = 3.5)
 
 # Regression test for difference in updated route score
 ur_data <- combined_results |>
@@ -126,9 +128,9 @@ uav_effect_data <- combined_results |>
 uav_effect_data |>
   pivot_longer(cols = c(sr_score, mean_ur_score)) |>
   ggplot(aes(x = k, y = value, color = clustering_method, linetype = name, group = paste(clustering_method, name))) +
-  geom_point(aes(shape = factor(k))) +
+  geom_point(aes(shape = clustering_method)) +
   geom_line() +
-  # facet_wrap(~clustering_method) +
+  facet_wrap(~clustering_method) +
   scale_x_continuous(n.breaks = 3) +
   theme_bw()
 
@@ -145,4 +147,29 @@ cowplot::plot_grid(
   nrow = 3
 )
 
-ggsave("./figures_for_report/compare_clustering_methods_sr.png", width = 13.5, height = 13.5)
+ggsave("./figures_for_report/compare_clustering_methods_sr.png", width = 13, height = 16.5)
+
+find_best_sc <- function(row_id) {
+  sc_score <- sapply(
+    uav_effect_data$scenarios[[row_id]],
+    function(x) do.call(sum, x$total_realized_score)
+  )
+  which.max(sc_score)
+}
+
+sapply(c(1,4,7,2,5,8,3,6,9), find_best_sc)
+
+cowplot::plot_grid(
+  plot(uav_effect_data$scenarios[[1]][[31]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[4]][[16]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[7]][[16]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[2]][[4]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[5]][[28]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[8]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[3]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[6]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[9]][[39]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  nrow = 3
+)
+
+ggsave("./figures_for_report/compare_clustering_methods_ur.png", width = 13, height = 16.5)

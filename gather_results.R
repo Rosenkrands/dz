@@ -24,7 +24,7 @@ library(tidyverse)
 
 rslt <- readRDS("./rslt_new_sr.rds")
 rslt <- rslt |>
-  mutate(sr_score = sapply(rslt$sr, function(x) do.call(sum, x$total_score)))
+  mutate(sr_score = sapply(seq_along(rslt$sr), function(i) {print(i); do.call(sum, rslt$sr[[i]]$total_score)}))
 
 message("Finding the best zones with best starting routes...")
 best <- rslt |>
@@ -39,7 +39,7 @@ heuristic_clusters <- pbapply::pblapply(1:nrow(best), function(row_id) {
   inst <- best$p_inst[[row_id]]; k = best$k[row_id]; L = best$L[row_id]/k; info = best$p_inst[[row_id]]$info
 
   suppressMessages(
-    clust_ls <- clustering(inst, k, L = L + .25*(200 - L), eps = 0, variances = NULL, info, cluster_method = "local_search", alpha = 1)
+    clust_ls <- clustering(inst, k, L = L + .25*(200 - L), eps = 0, variances = NULL, info, cluster_method = "local_search", alpha = 0)
   )
 
   return(clust_ls)
@@ -80,7 +80,8 @@ heuristic_sr <- pbapply::pblapply(1:nrow(heuristic_best), function(row_id) {
 heuristic_best$sr <- lapply(heuristic_sr, function(x) x[[2]])
 heuristic_best <- heuristic_best |>
   ungroup() |>
-  mutate(sr_score = sapply(heuristic_best$sr, function(x) do.call(sum, x$total_score))) |>
+  # mutate(sr_score = sapply(heuristic_best$sr, function(x) do.call(sum, x$total_score))) |>
+  mutate(sr_score = sapply(seq_along(heuristic_best$sr), function(i) {print(i); try(do.call(sum, heuristic_best$sr[[i]]$total_score))})) |>
   select(p_inst, clust, sr, sr_score, k, L)
 
 # best_sr <- pbapply::pblapply(1:nrow(best), function(row_id) {
@@ -112,7 +113,7 @@ heuristic_best <- heuristic_best |>
 message("Combining heuristic and routing-based into one...")
 combined_rslt <- bind_rows(
   best |> mutate(clustering_method = "routing-based"),
-  heuristic_best |> mutate(clustering_method = "heuristic")
+  heuristic_best |> mutate(clustering_method = "heuristic relevancy")
 )
 
 message("Simulating scenarios...")
@@ -207,4 +208,4 @@ combined_rslt$candidate_outside <- lapply(
 )
 
 message("Saving combined results...")
-saveRDS(combined_rslt, file = "C:/Users/krose/Desktop/combined_results.rds")
+saveRDS(combined_rslt, file = "C:/Users/krose/Desktop/combined_results_relevancy.rds")
