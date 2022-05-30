@@ -19,9 +19,7 @@ instance <- function(path_to_file) {
   points <- utils::read.table(path_to_file) |>
     tibble::tibble() |>
     dplyr::rename(x = V1, y = V2, score = V3) |>
-    dplyr::mutate(id = dplyr::row_number(), .before = dplyr::everything(),
-                  point_type = ifelse(score == 0, "terminal", "intermediate")) |>
-    dplyr::filter(dplyr::row_number() != dplyr::n()) # We assume source and sink are the node
+    dplyr::mutate(id = dplyr::row_number())
 
   # Compute edges in delaunay triangulation
   tri <- (deldir::deldir(points$x, points$y))$delsgs
@@ -92,7 +90,8 @@ plot.instance <- function(inst, delaunay = T) {
     ) +
     # ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
     ggplot2::theme_bw() +
-    ggplot2::guides(shape = "none", size = "none") + ggplot2::labs(x = "x", y = "y")
+    ggplot2::guides(shape = "none", size = "none") +
+    ggplot2::labs(x = "x", y = "y")
 
   return(p)
 }
