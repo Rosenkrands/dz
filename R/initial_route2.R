@@ -78,7 +78,8 @@ initial_route2 <- function(p_inst, L, info, top_percentile = .5) {
 
     # return SDR for the feasible nodes
     candidates <- r[(r > 0) & names(r) != "1"]
-    rslt <- candidates[1:round(length(candidates)*top_percentile)]
+    candidates <- sort(candidates, decreasing = T)
+    rslt <- candidates[1:ceiling(length(candidates)*top_percentile)]
     if (is.na(rslt)) return(integer()) else return(rslt)
   }
 
