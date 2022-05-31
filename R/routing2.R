@@ -995,5 +995,5 @@ plot.updated_routes <- function(ur, inst) {
       color = "none",
       alpha = "none",
       size = "none"
-    )
+    ) + ggplot2::labs(x = "x", y = "y")
 }
