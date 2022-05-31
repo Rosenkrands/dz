@@ -16,10 +16,12 @@
 #' @export
 #'
 instance <- function(path_to_file) {
+  # path_to_file = "inst/extdata/test_instances/chao/p7.txt"
   points <- utils::read.table(path_to_file) |>
     tibble::tibble() |>
     dplyr::rename(x = V1, y = V2, score = V3) |>
-    dplyr::mutate(id = dplyr::row_number())
+    dplyr::mutate(id = dplyr::row_number(),
+                  point_type = ifelse(id == 1, "source", ifelse(id == max(id), "sink", "node")))
 
   # Compute edges in delaunay triangulation
   tri <- (deldir::deldir(points$x, points$y))$delsgs
@@ -35,6 +37,20 @@ instance <- function(path_to_file) {
 
   # calculate distance matrix (based on shortest path)
   dst <- igraph::distances(g, algorithm = "dijkstra")
+
+  if (!igraph::is_connected(g)) {
+    # find neighbors of source node
+    nghbrs <- igraph::neighborhood(g, order = 1, nodes = "1")[[1]] |> names() |> as.integer()
+
+    # construct the edges to add, i.e. sink should have the same edges as source
+    edges_to_add <- do.call(
+      c,
+      lapply(nghbrs[-1], function(nghbr) c(max(inst$points$id), nghbr))
+    )
+
+    g <- igraph::add_edges(g, edges_to_add, attr = list("weight" = dst[1, nghbrs[-1]]))
+    dst <- igraph::distances(g, algorithm = "dijkstra")
+  }
 
   n <- nrow(points)
 
@@ -81,11 +97,11 @@ plot.instance <- function(inst, delaunay = T) {
   # Add points and title to the plot
   p <- p +
     ggplot2::geom_point(
-      data = inst$points |> dplyr::filter(point_type == "intermediate"),
+      data = inst$points |> dplyr::filter(point_type == "node"),
       ggplot2::aes(x, y, size = score, color = score, shape = point_type)
     ) +
     ggplot2::geom_point(
-      data = inst$points |> dplyr::filter(point_type == "terminal"),
+      data = inst$points |> dplyr::filter(point_type %in% c("source", "sink")),
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     # ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
