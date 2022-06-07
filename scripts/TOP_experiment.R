@@ -704,6 +704,12 @@ cr_nz <- cr_nz |>
   select(clustering_method, k, L, mean_ur_score, mean_nz_ur_score) |>
   mutate(`Number of agents` = factor(k))
 
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+gg_color_hue(4)
 
 a=.3; cr_nz |>
   filter(clustering_method == "RB") |>
@@ -727,7 +733,7 @@ a=.3; cr_nz |>
     geom_point(aes(y = mean_nz_ur_score, color = "TOP")) +
     geom_line(aes(y = mean_nz_ur_score, color = "TOP")) +
 
-    # scale_color_manual(values = c("grey", "grey", "grey", "black")) +
+    scale_color_manual(values = c("#7CAE00","#00BFC4","#F8766D","#C77CFF")) +
 
     facet_wrap(~`Number of agents`, labeller = "label_both") +
     theme_bw() + labs(color = "Solution method", x = "Total L across team", y = "Mean total realized score") +
@@ -789,3 +795,29 @@ plot(combined_results$scenarios[[i]]$`1`$ur, inst = test_instances$p7_chao)
 ggsave(paste0("./figures_for_report/", i, "_ZTOP.png"), width = 5, height = 5)
 plot_nz(nz_sr[[i]], inst = test_instances$p7_chao)
 ggsave(paste0("./figures_for_report/", i, "_TOP.png"), width = 5, height = 5)
+
+# statistical test
+
+cr_nz <- readRDS("cr_nz.rds")
+stat_data_cluster <- cr_nz |>
+  select(clustering_method, k, L, scenarios, nz_ur_score) |>
+  unnest(cols = scenarios) |>
+  mutate(ur_score = sapply(scenarios, function(x) do.call(sum, x$total_realized_score))) |>
+  select(clustering_method, k, L, ur_score)
+
+stat_data_nz <- cr_nz |>
+  select(clustering_method, k, L, nz_ur_score) |>
+  filter(clustering_method == "RB") |>
+  mutate(clustering_method = "TOP") |>
+  unnest(cols = nz_ur_score) |>
+  rename(ur_score = nz_ur_score)
+
+stat_data <- bind_rows(stat_data_cluster, stat_data_nz) |>
+  mutate(clustering_method = factor(clustering_method, levels = c("TOP", "RB", "HC", "HR")))
+
+
+summary(lm(ur_score ~ clustering_method, data = stat_data |> filter(k == 2)))
+summary(lm(ur_score ~ clustering_method, data = stat_data |> filter(k == 3)))
+summary(lm(ur_score ~ clustering_method, data = stat_data |> filter(k == 4)))
+
+xtable::xtable(summary(lm(ur_score ~ clustering_method, data = stat_data)))
