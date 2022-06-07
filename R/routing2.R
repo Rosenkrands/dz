@@ -7,7 +7,7 @@
 #' @return
 #' @export
 #'
-starting_routes <- function(inst, zones, L) {
+starting_routes <- function(inst, zones, L, L_budget = c("initial" = .6, "improve" = .8)) {
   # For testing purposes:
   # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20);p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones
 
@@ -88,7 +88,7 @@ starting_routes <- function(inst, zones, L) {
   # solve routing for each zone to get initial route
   solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
     # obj = 'SDR'; L = 100; zone_id = 1
-    L_remaining <- L
+    L_remaining <- L*L_budget["initial"]
     map = all_points |>
       dplyr::filter((id == 1) | (zone == zone_id))
 
@@ -157,17 +157,17 @@ starting_routes <- function(inst, zones, L) {
           #     route <- route[-i]; route <- route[-i]
           #   }
           # }
-          i = 1
-          while (i %in% (1:(length(route)-3))) {
-            if (is.na(route[i+3]) | is.na(route[i+2])) {
-              break
-            }
-            if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
-              route <- route[-i]; route <- route[-i]
-              i = i - 2
-            }
-            i = i + 1
-          }
+          # i = 1
+          # while (i %in% (1:(length(route)-3))) {
+          #   if (is.na(route[i+3]) | is.na(route[i+2])) {
+          #     break
+          #   }
+          #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
+          #     route <- route[-i]; route <- route[-i]
+          #     i = i - 2
+          #   }
+          #   i = i + 1
+          # }
           route_global <- vector(length = length(route))
           for (i in 1:length(route)){
             route_global[i] <- lookup$id[route[i]]
@@ -205,25 +205,28 @@ starting_routes <- function(inst, zones, L) {
         print(SDR[New_last])
 
         if (SDR[New_last] == 0) {# No SDR candidates can be reached, add route back to base
+          # stop()
           all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
-          route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
+          if (length(all_short_path_return) > 2) {
+            route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
+          }
           ### Remove duplicate e.g. 1 56 ... 30 1 30 1
           # for (i in 1:(length(route)-3)) {
           #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
           #     route <- route[-i]; route <- route[-i]
           #   }
           # }
-          i = 1
-          while (i %in% (1:(length(route)-3))) {
-            if (is.na(route[i+3]) | is.na(route[i+2])) {
-              break
-            }
-            if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
-              route <- route[-i]; route <- route[-i]
-              i = i - 2
-            }
-            i = i + 1
-          }
+            # i = 1
+            # while (i %in% (1:(length(route)-3))) {
+            #   if (is.na(route[i+3]) | is.na(route[i+2])) {
+            #     break
+            #   }
+            #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
+            #     route <- route[-i]; route <- route[-i]
+            #     i = i - 2
+            #   }
+            #   i = i + 1
+            # }
           route_global <- vector(length = length(route))
           for (i in 1:length(route)){
             route_global[i] <- lookup$id[route[i]]
@@ -254,7 +257,7 @@ starting_routes <- function(inst, zones, L) {
       # }
       #HERE
 
-      L_remaining <- L - route_length(route = route, g = g)
+      L_remaining <- L*L_budget["initial"] - route_length(route = route, g = g)
       # if(L_remaining < 0) {
       #   print("We are returning because L_remaining < 0")
       #   L_remaining <- L - route_length(route = route, g = g)
@@ -331,7 +334,7 @@ starting_routes <- function(inst, zones, L) {
     # L_remaining = r$L_remaining; route = r$route; zone_id = 1
     # route <- lookup$local_id[match(lookup$local_id, route)]
 
-    L_remaining <- L_remaining/2
+    L_remaining <- L*L_budget["improve"] - (L - L_remaining)
 
     map = all_points |>
       dplyr::filter((id == 1) | (zone == zone_id))
@@ -435,7 +438,7 @@ starting_routes <- function(inst, zones, L) {
       route <- append(route, short_path_back[2:(length(short_path_back)-1)], after = (New_node_placement + length(short_path_to) - 1))
       # route <- append(route, New_node[New_node_placement], after = New_node_placement)
       # Update L_remaining
-      L_remaining <- L - route_length(route, g = g)
+      L_remaining <- L*L_budget["improve"] - route_length(route, g = g)
       # Update score
       # map$score[New_node[New_node_placement]] <- 0
       map$score[unique(c(short_path_to, short_path_back))] <- 0

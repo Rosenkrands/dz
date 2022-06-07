@@ -54,6 +54,7 @@ rslt_sr <- pbapply::pblapply(1:nrow(rslt), function(row_id) {
 )
 
 rslt$sr <- lapply(rslt_sr, function(x) x[[2]])
+lapply(rslt_sr, function(x) class(x[[2]]))
 
 saveRDS(rslt, "./rslt_new_sr.rds")
 # rslt
