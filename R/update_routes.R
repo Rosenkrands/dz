@@ -312,5 +312,5 @@ plot.updated_routes2 <- function(ur, inst) {
     ggplot2::labs(
       color = "Zone"
     ) +
-    ggplot2::coord_fixed()
+    ggplot2::coord_fixed() + ggplot2::labs(x = "x", y = "y")
 }

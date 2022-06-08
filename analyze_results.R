@@ -115,11 +115,18 @@ summary(lm(cu ~ clustering_method, data = cu_data |> filter(k == 4, L < 300)))
 summary(lm(cu ~ clustering_method, data = cu_data))
 
 # Comparison of clustering method by mean number of candidates outside the zone
-ggplot(combined_results, aes(x = L, y = mean_candidate_outside, color = clustering_method)) +
+combined_results |>
+mutate(`Number of agents` = factor(k)) |>
+ggplot(aes(x = L, y = mean_candidate_outside, color = clustering_method)) +
   geom_point(aes(shape = clustering_method)) +
   geom_line(aes(linetype = clustering_method, group = paste(factor(k), clustering_method))) +
-  facet_wrap(~factor(k), labeller = label_both) +
-  theme_bw()
+  facet_wrap(~`Number of agents`, labeller = label_both) +
+  theme_bw() +
+  theme(legend.position = "top") +
+  labs(x = "Total L across team", y = "Mean total number of candidates outside",
+       color = "Solution method", shape = "Solution method", linetype = "Solution method")
+
+ggsave("./figures_for_report/Outside_clsuter_graph.pdf", width = 8, height = 3.5)
 
 # Effect of adding another UAV
 uav_effect_data <- combined_results |>
@@ -127,12 +134,49 @@ uav_effect_data <- combined_results |>
 
 uav_effect_data |>
   pivot_longer(cols = c(sr_score, mean_ur_score)) |>
+  mutate(name = factor(name,
+                       levels = c("sr_score", "mean_ur_score"),
+                       labels = c("Starting", "Updated")
+                       )) |>
   ggplot(aes(x = k, y = value, color = clustering_method, linetype = name, group = paste(clustering_method, name))) +
   geom_point(aes(shape = clustering_method)) +
   geom_line() +
   facet_wrap(~clustering_method) +
   scale_x_continuous(n.breaks = 3) +
-  theme_bw()
+  theme_bw() + theme(legend.position = "top") +
+  labs(x = "Number of agents", y = "Total score", linetype = "Route type", color = "Solution method", shape = "Solution method")
+
+ggsave("./figures_for_report/uav_effect.pdf", width = 8, height = 3.5)
+
+uav_effect_minmax <- combined_results |>
+  filter(L/k == 100) |>
+  mutate(`Number of agents` = factor(k)) |>
+  rowwise() |>
+  mutate(
+    ur_score = list(sapply(scenarios, function(x) do.call(sum, x$total_realized_score)))
+  ) |>
+  unnest(cols = ur_score) |>
+  ungroup() |>
+  group_by(clustering_method, `Number of agents`, L) |>
+  summarise(mean_ur = mean(ur_score),
+            min_ur = min(ur_score),
+            max_ur = max(ur_score))
+
+uav_effect_data |>
+  mutate(`Number of agents` = factor(k)) |>
+  ggplot(aes(x = `Number of agents`, group = paste(clustering_method))) +
+  geom_point(aes(y = sr_score, color = clustering_method), size = .8) +
+  geom_line(aes(y = sr_score, linetype = "Starting", color = clustering_method)) +
+  # geom_point(data = uav_effect_minmax, aes(y = mean_ur), size = 1) +
+  geom_line(data = uav_effect_minmax, aes(y = mean_ur, linetype = "Updated")) +
+  geom_errorbar(data = uav_effect_minmax, aes(ymin = min_ur, ymax = max_ur), width = .2)+
+  facet_wrap(~clustering_method) +
+  # scale_x_continuous(n.breaks = 3) +
+  theme_bw() + theme(legend.position = "top") +
+  labs(x = "Number of agents", y = "Total score", linetype = "Route type", color = "Solution method", shape = "Solution method")
+
+ggsave("./figures_for_report/uav_effect_w_error_new_sr.pdf", width = 8, height = 3.5)
+
 
 cowplot::plot_grid(
   plot(uav_effect_data$sr[[1]], inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
@@ -157,19 +201,42 @@ find_best_sc <- function(row_id) {
   which.max(sc_score)
 }
 
-sapply(c(1,4,7,2,5,8,3,6,9), find_best_sc)
+sapply(1:9, find_best_sc)
+7
+6
+2
+1
+1
+37
+7
+7
+50
+# cowplot::plot_grid(
+#   plot(uav_effect_data$scenarios[[1]][[31]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   plot(uav_effect_data$scenarios[[4]][[16]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   plot(uav_effect_data$scenarios[[7]][[16]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   plot(uav_effect_data$scenarios[[2]][[4]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   plot(uav_effect_data$scenarios[[5]][[28]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   plot(uav_effect_data$scenarios[[8]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   plot(uav_effect_data$scenarios[[3]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   plot(uav_effect_data$scenarios[[6]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   plot(uav_effect_data$scenarios[[9]][[39]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+#   nrow = 3,
+#   labels = "AUTO"
+# )
 
 cowplot::plot_grid(
-  plot(uav_effect_data$scenarios[[1]][[31]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  plot(uav_effect_data$scenarios[[4]][[16]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  plot(uav_effect_data$scenarios[[7]][[16]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  plot(uav_effect_data$scenarios[[2]][[4]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  plot(uav_effect_data$scenarios[[5]][[28]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  plot(uav_effect_data$scenarios[[8]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  plot(uav_effect_data$scenarios[[3]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  plot(uav_effect_data$scenarios[[6]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  plot(uav_effect_data$scenarios[[9]][[39]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
-  nrow = 3
+  plot(uav_effect_data$scenarios[[1]][[7]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[2]][[6]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[3]][[2]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[4]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[5]][[1]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[6]][[37]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[7]][[7]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[8]][[7]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  plot(uav_effect_data$scenarios[[9]][[50]]$ur, inst = uav_effect_data$p_inst[[1]]) + theme(legend.position = "none"),
+  nrow = 3,
+  labels = "AUTO"
 )
 
 ggsave("./figures_for_report/compare_clustering_methods_ur.png", width = 13, height = 16.5)

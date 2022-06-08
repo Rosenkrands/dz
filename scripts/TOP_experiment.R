@@ -586,3 +586,238 @@ nz_sr <- pbapply::pblapply(1:nrow(params), function(i) {
 
 saveRDS(nz_sr, "nz_sr.rds")
 
+# TODO: use ur_scenario function and record realized scores for no zone starting routes
+nz_sr <- readRDS("nz_sr.rds")
+
+ur_scenario <- function(row_id) {
+  # variables
+  p_inst <- combined_results$p_inst[[row_id]]
+  if (class(combined_results$clust[[row_id]]) == "rb_clustering") {
+    zones <- combined_results$clust[[row_id]]$zones
+  } else {
+    zones <- combined_results$clust[[row_id]]$cl$zones
+  }
+  L <- combined_results$L[row_id] / length(zones)
+  k <- length(zones)
+  sr <- combined_results$sr[[row_id]]
+  info <- combined_results$p_inst[[row_id]]$info
+
+  # update unexpected and realized score
+  p_inst$points <- p_inst$points |>
+    mutate(unexpected = purrr::rbernoulli(1, p = p_unexpected))
+
+  for (i in p_inst$points$id) { # we need to consider all nodes
+    related_nodes <- which(info[i,] != 0) # find the nodes that are related
+    for (j in related_nodes) { # update score
+      p_inst$points$expected_score[j] <- p_inst$points$score[j] + p_inst$points$p_unexpected[i] * info[i,j]
+      if (p_inst$points$unexpected[i]) {
+        p_inst$points$realized_score[j] <- p_inst$points$score[j] + info[i,j]
+      }
+    }
+  }
+
+  p_inst$points$expected_score[1] <- 0; p_inst$points$realized_score[1] <- 0
+
+  # Run update_routes2
+  ur <- update_routes2(p_inst, zones, L, k, sr, info)
+
+  # Find realized scores for no zone sr
+  nz_sr_id <- params |>
+    mutate(r = row_number()) |>
+    filter(k == length(zones), L == combined_results$L[row_id]) |>
+    pull(r)
+
+  nz_sr_score <- sum(p_inst$points$realized_score[
+    unique(do.call(c, nz_sr[[nz_sr_id]]$improved_routes))
+  ])
+
+  # construct the realized_score over time
+  ur_scores <- lapply(seq_along(ur$routes), function(route_id){
+    route_time_n_score <- function(id) {
+      sub_route <- ur$routes[[route_id]][1:id]
+
+      score <- sum(p_inst$points$realized_score[unique(sub_route)])
+      L_used <- tryCatch(sum(p_inst$dst[embed(sub_route, 2)]), error = function(e) 0)
+
+      tibble(L_used, score, route_id)
+    }
+
+    do.call(bind_rows, lapply(seq_along(ur$routes[[route_id]]), route_time_n_score))
+  })
+
+  ur_scores_w_L <- do.call(bind_rows, ur_scores) |>
+    pivot_wider(id_cols = c(L_used), names_from = "route_id", values_from = "score") |>
+    arrange(L_used) |>
+    fill(-L_used) |>
+    mutate(total_score = rowSums(across(-L_used))) |>
+    select(L_used, total_score)
+
+  # return results
+  list(
+    "ur" = ur,
+    "total_realized_score" = ur$total_realized_score,
+    "nz_total_realized_score" = nz_sr_score,
+    "candidate_outside" = ur$candidate_outside,
+    "ur_scores_w_L" = ur_scores_w_L
+  )
+}
+
+num_cores <- parallel::detectCores(logical = F)
+cl <- parallel::makeCluster(num_cores)
+
+parallel::clusterExport(cl, c('combined_results', 'ur_scenario', 'nz_sr', 'params'))
+invisible(parallel::clusterEvalQ(cl, {library(dz); library(tidyverse)}))
+
+combined_scenarios <- pbapply::pblapply(1:nrow(combined_results), function(row_id) {
+  reps = 1:50
+  scenarios <- lapply(reps, function(x) ur_scenario(row_id))
+  names(scenarios) <- reps
+  return(scenarios)
+}, cl = cl)
+
+combined_results$scenarios <- combined_scenarios
+
+message("Clean and augment the combined results dataset...")
+# combined_rslt$scenarios[[1]][[1]]
+
+combined_results$ur_score <- lapply(
+  combined_results$scenarios,
+  function(i) sapply(i, function(j) do.call(sum, j$total_realized_score))
+)
+
+combined_results$nz_ur_score <- lapply(
+  combined_results$scenarios,
+  function(i) sapply(i, function(j) j$nz_total_realized_score)
+)
+
+combined_results$candidate_outside <- lapply(
+  combined_results$scenarios,
+  function(i) sapply(i, function(j) do.call(sum, j$candidate_outside))
+)
+
+saveRDS(combined_results, "cr_nz.rds")
+
+cr_nz <- readRDS("cr_nz.rds")
+
+cr_nz <- cr_nz |>
+  mutate(mean_ur_score = sapply(ur_score, mean), mean_nz_ur_score = sapply(nz_ur_score, mean)) |>
+  select(clustering_method, k, L, mean_ur_score, mean_nz_ur_score) |>
+  mutate(`Number of agents` = factor(k))
+
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+gg_color_hue(4)
+
+a=.3; cr_nz |>
+  filter(clustering_method == "RB") |>
+  ggplot(aes(x = L)) +
+
+    geom_point(data = filter(cr_nz, clustering_method == "RB"),
+               aes(y = mean_ur_score, color = "RB"), alpha = a) +
+    geom_line(data = filter(cr_nz, clustering_method == "RB"),
+              aes(y = mean_ur_score, color = "RB"), alpha = a) +
+
+    geom_point(data = filter(cr_nz, clustering_method == "HC"),
+               aes(y = mean_ur_score, color = "HC"), alpha = a) +
+    geom_line(data = filter(cr_nz, clustering_method == "HC"),
+              aes(y = mean_ur_score, color = "HC"), alpha = a) +
+
+    geom_point(data = filter(cr_nz, clustering_method == "HR"),
+               aes(y = mean_ur_score, color = "HR"), alpha = a) +
+    geom_line(data = filter(cr_nz, clustering_method == "HR"),
+              aes(y = mean_ur_score, color = "HR"), alpha = a) +
+
+    geom_point(aes(y = mean_nz_ur_score, color = "TOP")) +
+    geom_line(aes(y = mean_nz_ur_score, color = "TOP")) +
+
+    scale_color_manual(values = c("#7CAE00","#00BFC4","#F8766D","#C77CFF")) +
+
+    facet_wrap(~`Number of agents`, labeller = "label_both") +
+    theme_bw() + labs(color = "Solution method", x = "Total L across team", y = "Mean total realized score") +
+    theme(legend.position = "top")
+
+ggsave("./figures_for_report/TOP_comparison.pdf", width = 8, height = 3.5)
+
+plot_nz <- function(sr, inst) {
+  route_segments <- tibble::tibble(routes = sr$improved_routes, agent_id = 1:length(sr$improved_routes)) |>
+    tidyr::unnest(routes) |>
+    dplyr::group_by(agent_id) |>
+    dplyr::mutate(id_start = dplyr::lag(routes), id_end = routes) |>
+    dplyr::filter(!is.na(id_start)) |>
+    dplyr::select(-routes) |>
+    dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
+                      by = c("id_start" = "id")) |>
+    dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
+                      by = c("id_end" = "id"), suffix = c("","end"))
+
+  ggplot2::ggplot() +
+    # ggplot2::geom_segment(
+    #   data = inst$edges,
+    #   ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+    #   color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+    # ) +
+    ggplot2::geom_point(
+      data = inst$points |>
+        dplyr::filter(point_type == "intermediate"), #|>
+        # dplyr::left_join(temp, by = c("id")),
+      ggplot2::aes(x, y, size = score), color = "grey"
+    ) +
+    ggplot2::geom_segment(
+      data = route_segments,
+      ggplot2::aes(x=x, y=y, xend=xend, yend=yend, color = as.character(agent_id)),
+      size = .75
+    ) +
+    ggplot2::geom_point(
+      data = inst$points |> dplyr::filter(point_type == "terminal"),
+      ggplot2::aes(x, y), color = "red", shape = 17
+    ) +
+    # ggplot2::scale_color_manual(values = c("black", scales::hue_pal()(k))) +
+    # ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
+    ggplot2::theme_bw() +
+    ggplot2::guides(
+      shape = "none",
+      fill = "none",
+      # color = "none",
+      alpha = "none",
+      size = "none"
+    ) +
+    ggplot2::labs(
+      color = "Agent id", x = "x", y = "y"
+    ) +
+    ggplot2::coord_fixed()
+}
+
+i = 33
+plot(combined_results$scenarios[[i]]$`1`$ur, inst = test_instances$p7_chao)
+ggsave(paste0("./figures_for_report/", i, "_ZTOP.png"), width = 5, height = 5)
+plot_nz(nz_sr[[i]], inst = test_instances$p7_chao)
+ggsave(paste0("./figures_for_report/", i, "_TOP.png"), width = 5, height = 5)
+
+# statistical test
+
+cr_nz <- readRDS("cr_nz.rds")
+stat_data_cluster <- cr_nz |>
+  select(clustering_method, k, L, scenarios, nz_ur_score) |>
+  unnest(cols = scenarios) |>
+  mutate(ur_score = sapply(scenarios, function(x) do.call(sum, x$total_realized_score))) |>
+  select(clustering_method, k, L, ur_score)
+
+stat_data_nz <- cr_nz |>
+  select(clustering_method, k, L, nz_ur_score) |>
+  filter(clustering_method == "RB") |>
+  mutate(clustering_method = "TOP") |>
+  unnest(cols = nz_ur_score) |>
+  rename(ur_score = nz_ur_score)
+
+stat_data <- bind_rows(stat_data_cluster, stat_data_nz) |>
+  mutate(clustering_method = factor(clustering_method, levels = c("TOP", "RB", "HC", "HR")))
+
+
+summary(lm(ur_score ~ clustering_method, data = stat_data |> filter(k == 2)))
+summary(lm(ur_score ~ clustering_method, data = stat_data |> filter(k == 3)))
+summary(lm(ur_score ~ clustering_method, data = stat_data |> filter(k == 4)))
+
+xtable::xtable(summary(lm(ur_score ~ clustering_method, data = stat_data)))
