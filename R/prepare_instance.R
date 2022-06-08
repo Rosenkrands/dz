@@ -1,23 +1,23 @@
 #' Prepare an instance for use with clustering and routing algorithms
 #'
-#' Generates variances and information and joins the information on the original instance
+#' Joins the information on the original instance
 #'
 #' @param name The name of the instance to use, eligible names are those in `names(dz::test_instances)`
-#' @param variances A list returned from the `generate_variances` function
 #' @param info A list returned from the `generate_information` function
 #'
 #' @return A list, i.e. a "prepared" instance
 #' @export
 #'
-prepare_instance <- function(inst, variances, info) {
+prepare_instance <- function(inst, info) {
   # For testing purposes:
   # inst <- test_instances$p7_chao; variances <- generate_variances(inst); info <- generate_information(inst)
 
   inst$points <- inst$points |>
-    dplyr::left_join(variances, by = c("id")) |>
-    dplyr::mutate(dplyr::across(.cols = c(score_variance, p_unexpected), ~ tidyr::replace_na(.x, 0))) |>
+    # dplyr::left_join(variances, by = c("id")) |>
+    # dplyr::mutate(dplyr::across(.cols = c(score_variance, p_unexpected), ~ tidyr::replace_na(.x, 0))) |>
     dplyr::rowwise() |>
     dplyr::mutate(
+      p_unexpected = runif(1, min = 0, max = .5),
       unexpected = purrr::rbernoulli(1, p = p_unexpected),
       realized_score = score,
       expected_score = score
@@ -45,7 +45,12 @@ prepare_instance <- function(inst, variances, info) {
   #   }
   # }
 
-  inst$points$expected_score[1] <- 0; inst$points$realized_score[1] <- 0
+  inst$points$expected_score[1] <- 0
+  inst$points$realized_score[1] <- 0
+
+  inst$points$expected_score[nrow(inst$points)] <- 0
+  inst$points$realized_score[nrow(inst$points)] <- 0
+
   inst$info <- info
 
   class(inst) <- "prepared_instance"
@@ -84,21 +89,21 @@ plot.prepared_instance <- function(p_inst) {
     ) +
     # Draw the intermediate nodes
     ggplot2::geom_point(
-      data = p_inst$points |> dplyr::filter(point_type == "intermediate", unexpected == F),
+      data = p_inst$points |> dplyr::filter(point_type == "node", unexpected == F),
       ggplot2::aes(x, y, size = score, color = score)
     ) +
     ggplot2::geom_point(
-      data = p_inst$points |> dplyr::filter(point_type == "intermediate", unexpected == T),
+      data = p_inst$points |> dplyr::filter(point_type == "node", unexpected == T),
       ggplot2::aes(x, y, size = score, color = score), shape = 1
     ) +
     # Draw a cross on intermediate nodes that have an unexpected observation
     ggplot2::geom_point(
-      data = p_inst$points |> dplyr::filter(point_type == "intermediate", unexpected == T),
+      data = p_inst$points |> dplyr::filter(point_type == "node", unexpected == T),
       ggplot2::aes(x = x, y = y), shape = 4
     ) +
     # Draw the terminal node
     ggplot2::geom_point(
-      data = p_inst$points |> dplyr::filter(point_type == "terminal"),
+      data = p_inst$points |> dplyr::filter(point_type %in% c("source", "sink")),
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     # Title, theme and legend adjustments

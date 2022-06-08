@@ -45,7 +45,7 @@ instance <- function(path_to_file) {
     # construct the edges to add, i.e. sink should have the same edges as source
     edges_to_add <- do.call(
       c,
-      lapply(nghbrs[-1], function(nghbr) c(max(inst$points$id), nghbr))
+      lapply(nghbrs[-1], function(nghbr) c(max(points$id), nghbr))
     )
 
     g <- igraph::add_edges(g, edges_to_add, attr = list("weight" = dst[1, nghbrs[-1]]))
@@ -107,7 +107,8 @@ plot.instance <- function(inst, delaunay = T) {
     # ggplot2::ggtitle(paste0("Instance: ", inst$name)) +
     ggplot2::theme_bw() +
     ggplot2::guides(shape = "none", size = "none") +
-    ggplot2::labs(x = "x", y = "y")
+    ggplot2::labs(x = "x", y = "y") +
+    ggplot2::coord_fixed()
 
   return(p)
 }
