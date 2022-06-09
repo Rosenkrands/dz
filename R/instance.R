@@ -20,6 +20,7 @@ instance <- function(path_to_file) {
   points <- utils::read.table(path_to_file) |>
     tibble::tibble() |>
     dplyr::rename(x = V1, y = V2, score = V3) |>
+    dplyr::distinct(x, y, .keep_all = T) |>
     dplyr::mutate(id = dplyr::row_number(),
                   point_type = ifelse(id == 1, "source", ifelse(id == max(id), "sink", "node")))
 
@@ -80,7 +81,7 @@ instance <- function(path_to_file) {
 #' @return A ggplot object
 #' @export
 #'
-plot.instance <- function(inst, delaunay = T) {
+plot.instance <- function(inst, delaunay = T, label = "point") {
   # Instantiate the ggplot object
   p <- ggplot2::ggplot()
 
@@ -95,11 +96,21 @@ plot.instance <- function(inst, delaunay = T) {
   }
 
   # Add points and title to the plot
+  if (label == "point") {
+    p <- p +
+      ggplot2::geom_point(
+        data = inst$points |> dplyr::filter(point_type == "node"),
+        ggplot2::aes(x, y, size = score, color = score, shape = point_type)
+      )
+  } else if (label == "text") {
+    p <- p +
+      ggplot2::geom_text(
+        data = inst$points |> dplyr::filter(point_type == "node"),
+        ggplot2::aes(x, y, label = id)
+      )
+  }
+
   p <- p +
-    ggplot2::geom_point(
-      data = inst$points |> dplyr::filter(point_type == "node"),
-      ggplot2::aes(x, y, size = score, color = score, shape = point_type)
-    ) +
     ggplot2::geom_point(
       data = inst$points |> dplyr::filter(point_type %in% c("source", "sink")),
       ggplot2::aes(x, y), color = "red", shape = 17
