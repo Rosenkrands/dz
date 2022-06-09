@@ -406,9 +406,9 @@ plot.rb_clustering <- function(rb_clust) {
     ) +
     ggplot2::geom_point(
       data = p_inst$points |>
-        dplyr::filter(point_type == "intermediate") |>
+        dplyr::filter(point_type == "node") |>
         dplyr::left_join(temp, by = c("id")),
-      ggplot2::aes(x, y, color = as.character(agent_id), size = score, alpha = score_variance)
+      ggplot2::aes(x, y, color = as.character(agent_id), size = score)
     ) +
     # ggplot2::scale_color_manual(values = c("black", scales::hue_pal()(k))) +
     ggplot2::ggtitle(paste0("Instance: ", p_inst$name)) +
