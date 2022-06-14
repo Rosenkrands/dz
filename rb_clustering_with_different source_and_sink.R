@@ -1,16 +1,16 @@
 pbapply::pboptions(use_lb = T)
 
-inst <- test_instances$p10_christofides
-plot(inst, label = "text")
+inst <- test_instances$p8_christofides
+# plot(inst, label = "text")
 
-plot(inst$g)
+# plot(inst$g)
 
 info <- generate_information(inst, r = 20)
 p_inst <- prepare_instance(inst, info)
 # plot(p_inst)
 
 L = 100
-k = 4
+k = 3
 
 num_cores <- parallel::detectCores(logical = F)
 cl <- parallel::makeCluster(num_cores)
@@ -19,7 +19,7 @@ invisible(parallel::clusterEvalQ(cl, {library(dz)}))
 
 greedy_routes <- pbapply::pblapply(
   1:1000,
-  function(x) greedy_route(p_inst, zone_id = 0, L = L, info, top_percentile = .5, nghbr_order = 2),
+  function(x) greedy_route(p_inst, zone_id = 0, L = L, info, top_percentile = .5, nghbr_order = 1),
   cl = cl
 )
 
@@ -68,6 +68,92 @@ dissimilarity <- dissimilarity + t(dissimilarity)
 
 hc <- stats::hclust(as.dist(dissimilarity))
 cluster <- cutree(hc, k)
+
+mean_routes <- lapply(1:k, function(cluster_id){
+  # Find routes in the cluster
+  c_routes <- which(cluster == cluster_id)
+
+  # Subset dissimilarity matrix
+  c_dis <- dissimilarity[c_routes, c_routes]
+
+  # Find the route with minimum dissimilarity to other routes in the cluster
+  mean_route_id <- c_routes[which.min(rowMeans(c_dis))]
+
+  # Return that route
+  init_routes[[mean_route_id]]
+})
+
+# find the most different routes
+most_different <- which(dissimilarity == max(dissimilarity), arr.ind = T)[1,]
+
+route_ids <- as.integer(most_different)
+
+which.max(abs(dissimilarity[route_ids[1], ] + dissimilarity[route_ids[2], ]))
+
+which.max(abs(dissimilarity[route_ids[1], ] + dissimilarity[route_ids[2], ] + dissimilarity[583, ]))
+
+plot_multiple_routes(list(init_routes[[135]], init_routes[[75]], init_routes[[583]], init_routes[[164]]))
+
+# plot multiple routes at once
+# plot(mean_routes[[4]])
+routes <- mean_routes
+plot_multiple_routes <- function(routes, label = "point") {
+  # For testing purposes:
+
+  # Generate route segments based on the route
+  route_segments <- tibble::tibble(route = lapply(routes, function(x) x$route), route_id = factor(1:length(routes))) |>
+    tidyr::unnest(cols = route) |>
+    dplyr::group_by(route_id) |>
+    dplyr::mutate(id_start = dplyr::lag(route), id_end = route) |>
+    dplyr::filter(!is.na(id_start)) |>
+    dplyr::select(-route) |>
+    dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
+                      by = c("id_start" = "id")) |>
+    dplyr::inner_join(inst$points |> dplyr::select(id, x, y),
+                      by = c("id_end" = "id"), suffix = c("","end")) |>
+    dplyr::group_by(route_id) |>
+    dplyr::mutate(n = runif(1), across(x:yend, ~ .x + n))
+
+  p <- ggplot2::ggplot()
+
+  if (label == "point") {
+    p <- p +
+      ggplot2::geom_point(
+        data = p_inst$points |> dplyr::filter(point_type == "node"),
+        ggplot2::aes(x, y, size = score, shape = point_type), alpha = .5
+      )
+  } else if (label == "text") {
+    p <- p +
+      ggplot2::geom_text(
+        data = p_inst$points |> dplyr::filter(point_type == "node"),
+        ggplot2::aes(x, y, label = id)
+      )
+  }
+
+  p <- p +
+    ggplot2::geom_segment(
+      data = p_inst$edges,
+      ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
+      color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+    ) +
+    ggplot2::geom_segment(
+      data = route_segments,
+      ggplot2::aes(x=x, y=y, xend=xend, yend=yend, color = route_id),
+      size = 1, alpha = .6
+    ) +
+    ggplot2::geom_point(
+      data = p_inst$points |> dplyr::filter(point_type %in% c("source", "sink")),
+      ggplot2::aes(x, y), color = "red", shape = 17
+    ) +
+    ggplot2::ggtitle(paste0("Instance: ", p_inst$name)) +
+    ggplot2::theme_bw() +
+    ggplot2::guides(shape = "none", size = "none") +
+    ggplot2::coord_fixed()
+
+  return(p)
+}
+
+plot_multiple_routes(routes)
 
 route_info <- tibble::tibble(
   id = lapply(init_routes, function(x) x$route),
