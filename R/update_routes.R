@@ -75,17 +75,17 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
       ) +
       ggplot2::geom_point(
         data = inst$points |>
-          dplyr::filter(point_type == "intermediate", id %in% zones[[zone_id]]) |>
+          dplyr::filter(point_type == "node", id %in% zones[[zone_id]]) |>
           dplyr::left_join(temp, by = c("id")),
         # ggplot2::aes(x, y, color = as.character(agent_id), size = score)
         ggplot2::aes(x, y, size = score), color = "darkgrey"
       ) +
       ggplot2::geom_text(
-        data = inst$points |> dplyr::filter(point_type == "intermediate", id %in% zones[[zone_id]]),
+        data = inst$points |> dplyr::filter(point_type == "node", id %in% zones[[zone_id]]),
         ggplot2::aes(x, y, label = id), nudge_x = .25, nudge_y = 1, size = 2.5
       ) +
       ggplot2::geom_text(
-        data = inst$points |> dplyr::filter(point_type == "intermediate", id %in% zones[[zone_id]]),
+        data = inst$points |> dplyr::filter(point_type == "node", id %in% zones[[zone_id]]),
         ggplot2::aes(x, y, label = round(score, 1)), nudge_x = -.35, nudge_y = 1, size = 2, color = "blue"
       ) +
       ggplot2::geom_segment(
@@ -287,7 +287,7 @@ plot.updated_routes2 <- function(ur, inst) {
     ) +
     ggplot2::geom_point(
       data = inst$points |>
-        dplyr::filter(point_type == "intermediate") |>
+        dplyr::filter(point_type == "node") |>
         dplyr::left_join(temp, by = c("id")),
       ggplot2::aes(x, y, color = as.character(agent_id), size = score)
     ) +
