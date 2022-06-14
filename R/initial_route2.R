@@ -183,3 +183,4 @@ plot.initial_route2 <- function(init_route, p_inst) {
     ggplot2::guides(shape = "none", size = "none") +
     ggplot2::coord_fixed()
 }
+
