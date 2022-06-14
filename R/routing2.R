@@ -553,7 +553,7 @@ plot.starting_routes <- function(sr, inst) {
     ) +
     ggplot2::geom_point(
       data = inst$points |>
-        dplyr::filter(point_type == "intermediate") |>
+        dplyr::filter(point_type == "node") |>
         dplyr::left_join(temp, by = c("id")),
       ggplot2::aes(x, y, color = as.character(agent_id), size = score)
     ) +
@@ -562,7 +562,7 @@ plot.starting_routes <- function(sr, inst) {
       ggplot2::aes(x=x, y=y, xend=xend, yend=yend)
     ) +
     ggplot2::geom_point(
-      data = inst$points |> dplyr::filter(point_type == "terminal"),
+      data = inst$points |> dplyr::filter(point_type == "source"),
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     # ggplot2::scale_color_manual(values = c("black", scales::hue_pal()(k))) +
@@ -974,7 +974,7 @@ plot.updated_routes <- function(ur, inst) {
     ) +
     ggplot2::geom_point(
       data = inst$points |>
-        dplyr::filter(point_type == "intermediate") |>
+        dplyr::filter(point_type == "node") |>
         dplyr::left_join(temp, by = c("id")),
       ggplot2::aes(x, y, color = as.character(agent_id), size = score)
     ) +
