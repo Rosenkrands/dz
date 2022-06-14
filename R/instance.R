@@ -20,7 +20,7 @@ instance <- function(path_to_file) {
   points <- utils::read.table(path_to_file) |>
     tibble::tibble() |>
     dplyr::rename(x = V1, y = V2, score = V3) |>
-    dplyr::distinct(x, y, .keep_all = T) |>
+    # dplyr::distinct(x, y, .keep_all = T) |>
     dplyr::mutate(id = dplyr::row_number(),
                   point_type = ifelse(id == 1, "source", ifelse(id == max(id), "sink", "node")))
 
@@ -89,9 +89,12 @@ plot.instance <- function(inst, delaunay = T, label = "point") {
   if (delaunay) {
     p <- p +
       ggplot2::geom_segment(
-        data = inst$edges,
-        ggplot2::aes(x = x1, y = y1, xend = x2, yend = y2),
-        color = ggplot2::alpha("black", 0.3), linetype = "dashed"
+        data = tibble::as_tibble(igraph::as_edgelist(inst$g)) |>
+          dplyr::mutate(across(dplyr::everything(), .fns = as.integer)) |>
+          dplyr::inner_join(inst$points |> dplyr::select(id, x, y), by = c("V1" = "id")) |>
+          dplyr::inner_join(inst$points |> dplyr::select(id, x, y), by = c("V2" = "id"), suffix = c("","1")),
+        ggplot2::aes(x = x, y = y, xend = x1, yend = y1),
+        color = ggplot2::alpha("black", 0.2)
       )
   }
 
