@@ -549,6 +549,8 @@ animate_local_search <- function(clust, filename = "animation.gif") {
     interval = .1,
     ani.width = 1920,
     ani.height = 1080,
-    ani.res = 250
+    ani.res = 250,
+    loop = 1,
+    clean = F
   )
 }
