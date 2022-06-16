@@ -1,6 +1,6 @@
 pbapply::pboptions(use_lb = T)
 
-inst <- test_instances$p8_christofides
+inst <- test_instances$p7_chao
 # plot(inst, label = "text")
 
 # plot(inst$g)
