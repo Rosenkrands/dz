@@ -7,8 +7,8 @@ top_percentile = .5
 
 repetitions <- 1
 inst <- test_instances$p7_chao
-L <- seq(425, 500, 25)
-k <- c(5)
+L <- seq(570, 600, 30)
+k <- c(6)
 
 # variances <- generate_variances(inst)
 info <- generate_information(inst)
@@ -86,6 +86,8 @@ closeAllConnections()
 success <- lapply(rslt_list, function(x) "tbl_df" %in% class(x))
 rslt <- dplyr::bind_rows(rslt_list[do.call(c, success)])
 failed <- rslt_list[!do.call(c, success)]
+
+plot(rslt$`list(sr)`[[1]], inst = inst)
 
 saveRDS(
   rslt,
