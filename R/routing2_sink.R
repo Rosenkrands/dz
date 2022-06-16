@@ -7,9 +7,9 @@
 #' @return
 #' @export
 #'
-starting_routes <- function(inst, zones, L) {
+starting_routes_sink <- function(inst, zones, L, L_budget = c("initial" = .6, "improve" = .8)) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20);p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones
+  # inst = test_instances$p8_christofides; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20);p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones
 
   # Join zones on instance
   all_points <- inst$points |>
@@ -21,6 +21,7 @@ starting_routes <- function(inst, zones, L) {
     )
 
   all_points$zone[1] <- 0
+  all_points$zone[length(all_points$zone)] <- 0
 
   # clustering_result <- clustering(inst = test_instances$p7_chao, k = 3, L = 100, eps = 0, cluster_method = "local_search", variances = generate_variances(inst), alpha = 0, info <- generate_information(inst, r = 100))
 
@@ -88,9 +89,9 @@ starting_routes <- function(inst, zones, L) {
   # solve routing for each zone to get initial route
   solve_routing <- function(obj = 'SDR', L = 100, zone_id = 1){
     # obj = 'SDR'; L = 100; zone_id = 1
-    L_remaining <- L
+    L_remaining <- L*L_budget["initial"]
     map = all_points |>
-      dplyr::filter((id == 1) | (zone == zone_id))
+      dplyr::filter((id == 1) | (point_type == "sink") | (zone == zone_id))
 
     delsgs <- same_zone_edges |>
       dplyr::filter(zone == zone_id) |>
@@ -114,7 +115,8 @@ starting_routes <- function(inst, zones, L) {
     route = integer()
     route <- append(route, 1)
     last_in_current <- route[length(route)]
-    route <- append(route, 1)
+    ssink <- (map$local_id)[length(map$local_id)]
+    route <- append(route, ssink)
     s_total <- 0
     while (L_remaining > 0) {
       # if (tail(route, 2) == c(11,1)) stop()
@@ -132,10 +134,10 @@ starting_routes <- function(inst, zones, L) {
           #
           d[i] <- dist(route[length(route)-1], candidates[i], g = g) +
             dist(candidates[i], 1, g = g) -
-            as.vector(dist(route[length(route_temp)-2], 1, g = g))
+            as.vector(dist(route[length(route_temp)-2], ssink, g = g))
           # Make vector of nodes in path to and from candidate, to base score of
           sp1_nodes <- dist2(route[length(route)-1], candidates[i], g = g)
-          sp2_nodes <- dist2(candidates[i], 1, g = g)
+          sp2_nodes <- dist2(candidates[i], ssink, g = g)
           s_path <- c(sp1_nodes, sp2_nodes[2:(length(sp2_nodes))])
           # s[i] <- sum(map$score[unique(s_path)]) # consider score to New_last and back to base
           s[i] <- sum(map$score[unique(sp1_nodes)]) # consider only score to New_last, disregard path to base
@@ -149,25 +151,8 @@ starting_routes <- function(inst, zones, L) {
 
         New_last <- which.max(SDR)
         if (New_last == 1) {
-          all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
+          all_short_path_return <- dist2(route[(length(route)-1)], ssink, g = g)
           route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
-          ### Remove duplicate e.g. 1 56 ... 30 1 30 1
-          # for (i in 1:(length(route)-3)) {
-          #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
-          #     route <- route[-i]; route <- route[-i]
-          #   }
-          # }
-          i = 1
-          while (i %in% (1:(length(route)-3))) {
-            if (is.na(route[i+3]) | is.na(route[i+2])) {
-              break
-            }
-            if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
-              route <- route[-i]; route <- route[-i]
-              i = i - 2
-            }
-            i = i + 1
-          }
           route_global <- vector(length = length(route))
           for (i in 1:length(route)){
             route_global[i] <- lookup$id[route[i]]
@@ -179,17 +164,9 @@ starting_routes <- function(inst, zones, L) {
           return(output)
         }
         sp1_nodes_g <- dist2(route[length(route)-1], New_last, g = g)
-        sp2_nodes_g <- dist2(New_last, 1, g = g)
+        sp2_nodes_g <- dist2(New_last, ssink, g = g)
         s_path_g <- c(sp1_nodes_g, sp2_nodes_g[2:(length(sp2_nodes_g))])
-        # s_total <- sum(map$score[unique(s_path_g)]) + s_total
-        # map$score[unique(s_path_g)] <- 0
 
-        # Moved to below next while loop!
-        # all_short_path <- dist2(route[length(route)-1], New_last, g = g)
-        # for (node in (all_short_path[2:length(all_short_path)])) {
-        #   s_total <- s_total + map$score[node]
-        #   map$score[node] <- 0
-        # }
       }
       if (obj == 'random'){
         New_last <- sample(2:101, size = 1)
@@ -198,32 +175,19 @@ starting_routes <- function(inst, zones, L) {
         map[New_last,]$score <- 0
         # print(New_last)
       }
-      while ((dist(last_in_current, New_last, g = g) + dist(New_last, 1, g = g) - dist(last_in_current,  1, g = g)) > L_remaining){ # if there is not enough range to visit new last, then check the next one
+      while ((dist(last_in_current, New_last, g = g) + dist(New_last, ssink, g = g) - dist(last_in_current,  ssink, g = g)) > L_remaining){ # if there is not enough range to visit new last, then check the next one
         SDR[New_last] <- 0
         New_last <- which.max(SDR)
         print(New_last)
         print(SDR[New_last])
 
         if (SDR[New_last] == 0) {# No SDR candidates can be reached, add route back to base
-          all_short_path_return <- dist2(route[(length(route)-1)], 1, g = g)
-          route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
-          ### Remove duplicate e.g. 1 56 ... 30 1 30 1
-          # for (i in 1:(length(route)-3)) {
-          #   if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
-          #     route <- route[-i]; route <- route[-i]
-          #   }
-          # }
-          i = 1
-          while (i %in% (1:(length(route)-3))) {
-            if (is.na(route[i+3]) | is.na(route[i+2])) {
-              break
-            }
-            if (route[i] == route[i+2] & route[i+1] == route[i+3]) {
-              route <- route[-i]; route <- route[-i]
-              i = i - 2
-            }
-            i = i + 1
+          # stop()
+          all_short_path_return <- dist2(route[(length(route)-1)], ssink, g = g)
+          if (length(all_short_path_return) > 2) {
+            route <- append(route, all_short_path_return[2:(length(all_short_path_return)-1)], after = length(route)-1)
           }
+
           route_global <- vector(length = length(route))
           for (i in 1:length(route)){
             route_global[i] <- lookup$id[route[i]]
@@ -245,83 +209,8 @@ starting_routes <- function(inst, zones, L) {
       route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
       last_in_current <- route[length(route)-1]
       print(route)
-      # construct route to determine length, including path to the source
-      #HERE
-      # route_temp <- c(route[-length(route)], dist2(route[length(route) - 1], 1, g = g)[-1])
-      # route_global <- vector(length = length(route_temp))
-      # for (i in 1:length(route_temp)){
-      #   route_global[i] <- lookup$id[route_temp[i]]
-      # }
-      #HERE
 
-      L_remaining <- L - route_length(route = route, g = g)
-      # if(L_remaining < 0) {
-      #   print("We are returning because L_remaining < 0")
-      #   L_remaining <- L - route_length(route = route, g = g)
-      #   route_global <- vector(length = length(route))
-      #   for (i in 1:length(route)){
-      #     route_global[i] <- lookup$id[route[i]]
-      #     output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
-      #   }
-      #   return(output)
-      # } else {
-      #   route <- append(route, all_short_path[2:length(all_short_path)], after = length(route)-1)
-      # }
-      # while (L_remaining < 0) {
-      #   # route[-(length(route)-1)]
-      #   route_temp <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
-      #   L_remaining <- L - route_length(route = route_temp, g = g)
-      #   SDR <- rep(0, length(SDR))
-      #   print(route_temp)
-      #   route <- route_temp
-      # }
-
-      # print(route)
-      # if (L_remaining < 50) {
-        # route_global <- vector(length = length(route))
-        # for (i in 1:length(route)){
-        #   route_global[i] <- lookup$id[route[i]]
-        # }
-      #   output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
-      #   return(output)
-      # }
-      # print(SDR)
-      #HERE
-      # if (max(SDR) == 0){
-      #   # If last before source is not directly connected to source
-      #   if (length((dist2(route[(length(route)-1)], route[length(route)], g = g))) > 2) {
-      #     # Connect them if L_remaining allows it, otherwise remove some of the route
-      #     if (route_length(route = route, g = g) <= L){
-      #       # Add shortest path to source to "route"
-      #       sp_last <- dist2(route[(length(route)-1)], route[length(route)], g = g)
-      #       route <- append(route, sp_last[2:(length(sp_last)-1)], after = (length(route)-1))
-      #       # Make sure we return after this
-      #       # SDR <- rep(0, length(SDR))
-      #     } else {
-      #       while (route_length(route = route, g = g) > L) {
-      #         # Remove last in route
-      #         route <- c(route[-((length(route)-1):length(route))], dist2(route[length(route) - 1], 1, g = g)[-1])
-      #         L_remaining <- L - route_length(route = route_temp, g = g)
-      #       }
-      #       sp_last <- dist2(route[(length(route)-1)], route[length(route)], g = g)
-      #       route <- append(route, sp_last[2:(length(sp_last)-1)], after = (length(route)-1))
-      #       # SDR <- rep(0, length(SDR))
-      #     }
-      #   }
-      #   route_global <- vector(length = length(route))
-      #   for (i in 1:length(route)){
-      #     route_global[i] <- lookup$id[route[i]]
-      #   }
-      #   ### Remove duplicate e.g. 1 56 ... 30 1 30 1
-      #   #HERE
-      #   # for (i in (length(route_global)-3)) {
-      #   #   if (route_global[i] == route_global[i+2] & route_global[i+1] == route_global[i+3]) {
-      #   #     route_global <- route_global[-i]; route_global <- route_global[-i]
-      #   #   }
-      #   # }
-      #   output <- list("route" = route_global, "L_remaining" = L_remaining, "s_total" = s_total, "delsgs" = delsgs, "lookup" = lookup)
-      #   return(output)
-      # }
+      L_remaining <- L*L_budget["initial"] - route_length(route = route, g = g)
     }
   }
 
@@ -331,10 +220,10 @@ starting_routes <- function(inst, zones, L) {
     # L_remaining = r$L_remaining; route = r$route; zone_id = 1
     # route <- lookup$local_id[match(lookup$local_id, route)]
 
-    L_remaining <- L_remaining/2
+    L_remaining <- L*L_budget["improve"] - (L - L_remaining)
 
     map = all_points |>
-      dplyr::filter((id == 1) | (zone == zone_id))
+      dplyr::filter((id == 1) | (point_type == "sink") | (zone == zone_id))
 
     delsgs <- same_zone_edges |>
       dplyr::filter(zone == zone_id) |>
@@ -435,7 +324,7 @@ starting_routes <- function(inst, zones, L) {
       route <- append(route, short_path_back[2:(length(short_path_back)-1)], after = (New_node_placement + length(short_path_to) - 1))
       # route <- append(route, New_node[New_node_placement], after = New_node_placement)
       # Update L_remaining
-      L_remaining <- L - route_length(route, g = g)
+      L_remaining <- L*L_budget["improve"] - route_length(route, g = g)
       # Update score
       # map$score[New_node[New_node_placement]] <- 0
       map$score[unique(c(short_path_to, short_path_back))] <- 0
@@ -553,7 +442,7 @@ plot.starting_routes <- function(sr, inst) {
     ) +
     ggplot2::geom_point(
       data = inst$points |>
-        dplyr::filter(point_type == "node") |>
+        dplyr::filter(point_type == "intermediate") |>
         dplyr::left_join(temp, by = c("id")),
       ggplot2::aes(x, y, color = as.character(agent_id), size = score)
     ) +
@@ -562,7 +451,7 @@ plot.starting_routes <- function(sr, inst) {
       ggplot2::aes(x=x, y=y, xend=xend, yend=yend)
     ) +
     ggplot2::geom_point(
-      data = inst$points |> dplyr::filter(point_type == "source"),
+      data = inst$points |> dplyr::filter(point_type == "terminal"),
       ggplot2::aes(x, y), color = "red", shape = 17
     ) +
     # ggplot2::scale_color_manual(values = c("black", scales::hue_pal()(k))) +
@@ -602,7 +491,7 @@ plot.starting_routes <- function(sr, inst) {
 #'
 #' @examples
 
-update_routes <- function(sr, L, variances, info) {
+update_routes_sink <- function(sr, L, variances, info) {
   # For testing purposes:
   # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); p_inst <- prepare_instance(inst, variances = generated_variances, info = info); rb_clust <- rb_clustering(p_inst = p_inst, num_route = 100, info = info, k = 3, L = 100); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 
@@ -936,7 +825,7 @@ update_routes <- function(sr, L, variances, info) {
 #' @export
 #'
 #' @examples
-plot.updated_routes <- function(ur, inst) {
+plot.updated_routes_sink <- function(ur, inst) {
   # inst = test_instances$p7_chao; L = 100; k = 3; variances = generate_variances(inst = inst); info = generate_information(inst, r = 20); rb_clust <- rb_clustering(inst, L, k, num_routes = 100, variances, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L); ur <- update_routes(sr, L, variances, info)
 
   temp <- tibble::tibble(id = ur$zones, agent_id = 1:length(ur$zones)) |>
@@ -995,5 +884,5 @@ plot.updated_routes <- function(ur, inst) {
       color = "none",
       alpha = "none",
       size = "none"
-    )
+    ) + ggplot2::labs(x = "x", y = "y")
 }

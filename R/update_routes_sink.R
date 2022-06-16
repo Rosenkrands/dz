@@ -10,7 +10,7 @@
 #' @return
 #' @export
 #'
-update_routes2 <- function(p_inst, zones, L, k, sr, info) {
+update_routes2_sink <- function(p_inst, zones, L, k, sr, info) {
   # For testing purposes:
   # set.seed(1); inst <- test_instances$p7_chao; L <- 100; k <- 4; variances <- generate_variances(inst); info <- generate_information(inst); p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L)
 
@@ -75,17 +75,17 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
       ) +
       ggplot2::geom_point(
         data = inst$points |>
-          dplyr::filter(point_type == "node", id %in% zones[[zone_id]]) |>
+          dplyr::filter(point_type == "intermediate", id %in% zones[[zone_id]]) |>
           dplyr::left_join(temp, by = c("id")),
         # ggplot2::aes(x, y, color = as.character(agent_id), size = score)
         ggplot2::aes(x, y, size = score), color = "darkgrey"
       ) +
       ggplot2::geom_text(
-        data = inst$points |> dplyr::filter(point_type == "node", id %in% zones[[zone_id]]),
+        data = inst$points |> dplyr::filter(point_type == "intermediate", id %in% zones[[zone_id]]),
         ggplot2::aes(x, y, label = id), nudge_x = .25, nudge_y = 1, size = 2.5
       ) +
       ggplot2::geom_text(
-        data = inst$points |> dplyr::filter(point_type == "node", id %in% zones[[zone_id]]),
+        data = inst$points |> dplyr::filter(point_type == "intermediate", id %in% zones[[zone_id]]),
         ggplot2::aes(x, y, label = round(score, 1)), nudge_x = -.35, nudge_y = 1, size = 2, color = "blue"
       ) +
       ggplot2::geom_segment(
@@ -118,6 +118,8 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
     # subgraph for the zone and distances
     sub_g <- igraph::induced_subgraph(p_inst$g, vids = zones[[zone_id]])
     sub_dst <- igraph::distances(sub_g)
+
+    ssink <- (zones[[zone_id]])[length(zones[[zone_id]])]
 
     original_route <- sr$improved_routes[[zone_id]]
     L_remaining <- sr$L_remaining[[zone_id]]
@@ -203,11 +205,11 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
 
       # plot_progress()
 
-      if ((remaining_route[1] == 1) & (length(remaining_route) == 1)) {
+      if ((remaining_route[1] == ssink) & (length(remaining_route) == 1)) {
         id_now <- tail(route, 1)#; cat("id_now is", id_now, "\n")
         score[id_now] <- 0; realized_score[id_now] <- 0
 
-        route <- append(route, 1)
+        route <- append(route, ssink)
         remaining_route <- integer()
         break
       }
@@ -248,7 +250,7 @@ update_routes2 <- function(p_inst, zones, L, k, sr, info) {
 #' @return
 #' @export
 #'
-plot.updated_routes2 <- function(ur, inst) {
+plot.updated_routes2_sink <- function(ur, inst) {
   # For testing purposes:
   # set.seed(1); inst <- test_instances$p7_chao; L <- 340/2; k <- 2; variances <- generate_variances(inst); info <- generate_information(inst); p_inst <- prepare_instance(inst, variances, info); rb_clust <- rb_clustering(p_inst, L, k, num_routes = 100, info); zones <- rb_clust$zones; sr <- starting_routes(inst, zones, L); ur <- update_routes2(p_inst, zones, L, k, sr, info)
 
@@ -287,7 +289,7 @@ plot.updated_routes2 <- function(ur, inst) {
     ) +
     ggplot2::geom_point(
       data = inst$points |>
-        dplyr::filter(point_type == "node") |>
+        dplyr::filter(point_type == "intermediate") |>
         dplyr::left_join(temp, by = c("id")),
       ggplot2::aes(x, y, color = as.character(agent_id), size = score)
     ) +

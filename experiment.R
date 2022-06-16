@@ -5,14 +5,14 @@ pbapply::pboptions(use_lb = T)
 # Variables
 top_percentile = .5
 
-repetitions <- 1:2
+repetitions <- 1
 inst <- test_instances$p7_chao
-L <- seq(200, 400, 20)
-k <- c(2, 3, 4)
+L <- seq(570, 600, 30)
+k <- c(6)
 
-variances <- generate_variances(inst)
+# variances <- generate_variances(inst)
 info <- generate_information(inst)
-p_inst_list <- pbapply::pblapply(repetitions, function(x) prepare_instance(inst, variances, info))
+p_inst_list <- pbapply::pblapply(repetitions, function(x) prepare_instance(inst, info))
 
 arguments <- expand.grid(rep_id = repetitions, L = L, k = k) |>
   dplyr::mutate(L = L/k)
@@ -43,7 +43,7 @@ rslt_list <- pbapply::pblapply(1:nrow(arguments), function(i) {
         max_tries = 3
         attempt_no = 1
         while (attempt_no <= max_tries) {
-          rb_clust <- try(rb_clustering(p_inst, L_adj, k, num_routes, info, top_percentile = top_percentile, weigthed = F))
+          rb_clust <- try(rb_clustering(p_inst, L = L_adj, k, num_routes, info, top_percentile = top_percentile, weigthed = F))
           if (class(rb_clust) == "try-error") attempt_no = attempt_no + 1 else break
         }
         if (class(rb_clust) == "try-error") stop(as.character(rb_clust))
@@ -87,9 +87,11 @@ success <- lapply(rslt_list, function(x) "tbl_df" %in% class(x))
 rslt <- dplyr::bind_rows(rslt_list[do.call(c, success)])
 failed <- rslt_list[!do.call(c, success)]
 
+plot(rslt$`list(sr)`[[1]], inst = inst)
+
 saveRDS(
   rslt,
-  file = paste0("C:\\Users\\krose\\Desktop\\experiment_",sub("\\.", "dot", top_percentile),"_rslt.RDS")
+  file = paste0("C:\\Users\\krose\\Desktop\\experiment_",sub("\\.", "dot", top_percentile),"_rslt_5UAV_500.RDS")
 )
 saveRDS(
   failed,
@@ -108,7 +110,7 @@ saveRDS(
 # plot(rslt$`list(ur)`[[32]], inst)
 
 # Analyze results
-results_direc <- "C:/Users/krose/Desktop/experiment results"
+results_direc <- "C:/Users/krose/Desktop/experiment results 5UAV"
 direcs <- list.files(results_direc, full.names = F)
 
 load_results_files <- function(direc) {
