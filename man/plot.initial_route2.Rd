@@ -11,9 +11,6 @@
 
 \item{inst}{}
 }
-\value{
-
-}
 \description{
 Plot the initial route on the instance
 }

@@ -9,9 +9,6 @@ update_routes2(p_inst, zones, L, k, sr, info)
 \arguments{
 \item{info}{}
 }
-\value{
-
-}
 \description{
 update routes based on the new information available during mission
 }

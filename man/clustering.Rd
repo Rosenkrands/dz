@@ -8,7 +8,7 @@ clustering(
   inst,
   k,
   L,
-  eps,
+  eps = 0,
   variances,
   info,
   cluster_method = c("greedy", "local_search"),

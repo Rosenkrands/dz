@@ -9,9 +9,6 @@
 \arguments{
 \item{inst}{}
 }
-\value{
-
-}
 \description{
 Plot method for the updated routes
 }

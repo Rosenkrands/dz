@@ -1,5 +1,6 @@
 library(dz)
-set.seed(1)
+library(tidyverse)
+set.seed(2)
 
 inst = test_instances$p7_chao
 variances = generate_variances(inst)
@@ -24,13 +25,18 @@ parallel::clusterExport(cl, c('inst', 'variances', 'L', 'info', 'benchmark_funct
 invisible(parallel::clusterEvalQ(cl, {library(dz)}))
 
 rslt <- pbapply::pblapply(
-  rep(percentiles, 1000),
+  rep(percentiles, 500),
   function(x) benchmark_function(num_routes = 1, top_percentile = x),
   cl = cl
 )
 
-names(rslt) <- rep(percentiles, 1000)
+names(rslt) <- rep(percentiles, 500)
 
-tibble::tibble(name = rep(as.character(percentiles), 1000), value = do.call(c, rslt)) |>
+tibble::tibble(name = rep(as.character(percentiles), 500), value = do.call(c, rslt)) |>
   ggplot2::ggplot() +
-  ggplot2::geom_boxplot(ggplot2::aes(x = name, fill = name, y = value), alpha = .2)
+  ggplot2::geom_boxplot(ggplot2::aes(x = name, y = value), alpha = .2) +
+  theme_bw() +
+  # theme(legend.position = "")
+  labs(x = "Top percentile", y = "Route score")
+
+ggsave("./figures_for_report/top_percentile_tuning.pdf", width = 6, height = 2.5)

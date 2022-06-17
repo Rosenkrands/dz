@@ -4,13 +4,10 @@
 \alias{starting_routes}
 \title{Find the starting routes based on provided zones}
 \usage{
-starting_routes(inst, zones, L)
+starting_routes(inst, zones, L, L_budget = c(initial = 0.6, improve = 0.8))
 }
 \arguments{
 \item{L}{}
-}
-\value{
-
 }
 \description{
 Find the starting routes based on provided zones

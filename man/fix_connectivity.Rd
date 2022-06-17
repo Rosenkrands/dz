@@ -9,9 +9,6 @@ fix_connectivity(inst, zones, available_nodes = integer())
 \arguments{
 \item{available_nodes}{}
 }
-\value{
-
-}
 \description{
 Fix connectivity in zones
 }

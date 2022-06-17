@@ -20,9 +20,6 @@ rb_clustering(
 \arguments{
 \item{shiny}{}
 }
-\value{
-
-}
 \description{
 Routing based clustering
 }

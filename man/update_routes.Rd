@@ -9,9 +9,6 @@ update_routes(sr, L, variances, info)
 \arguments{
 \item{info}{}
 }
-\value{
-
-}
 \description{
 Update the starting routes based on realized scores
 }

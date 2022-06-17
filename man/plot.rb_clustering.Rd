@@ -9,9 +9,6 @@
 \arguments{
 \item{rb_clust}{}
 }
-\value{
-
-}
 \description{
 Plot the result from routing-based clustering
 }
