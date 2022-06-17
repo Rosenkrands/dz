@@ -1,4 +1,4 @@
-library(dz)
+# library(dz)
 library(tidyverse)
 set.seed(6)
 
@@ -176,7 +176,7 @@ plot_zones_disputed <- function(zones) {
     ) |>
     dplyr::filter((zone.x == zone.y) | (zone.x == 0) | (zone.y == 0) | (disputed.x == 1) | (disputed.y == 1)) |>
     # dplyr::filter((zone.x == zone.y) | (zone.x == 0) | (zone.y == 0)) |>
-    # dplyr::filter(!is.na(zone.x) & !is.na(zone.y)) |>
+    dplyr::filter(!is.na(zone.x) & !is.na(zone.y)) |>
     dplyr::mutate(zone = ifelse(zone.x == 0, zone.y, zone.x)) |>
     dplyr::select(-c(zone.x,zone.y)) |>
     dplyr::distinct(ind1, ind2, .keep_all = T)
