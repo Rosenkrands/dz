@@ -16,11 +16,92 @@
 #'
 clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c("greedy", "local_search"), alpha = 1) {
   # For testing purposes:
-  # inst = test_instances$p7_chao; k = 5; L = 40; eps = 0; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 0; info <- generate_information(inst, r = 100)
+  # library(devtools); load_all(); inst = test_instances$p7_chao; k = 5; L = 40; eps = 0; cluster_method = "local_search"; variances = generate_variances(inst); alpha = 0; info <- generate_information(inst, r = 20)
+
+  # plot(clustering(inst, k, L, eps, variances, info, cluster_method = "greedy", alpha = 1))
 
   # Already joined with the variances
   # inst$points <- inst$points |>
     # dplyr::left_join(variances, by = c("id")) # Join variances on points tibble
+
+  # helper functions
+  avg_dist_profit <- function(zone) {
+    dst_temp <- dst[zone, zone] # subset the distance matrix (of shortest paths) to only nodes in the zone
+    avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)]) # dst_temp is symmetric so we only need the lower triange (or equivalently upper) not including the diagonal (of all zeroes corresponding to all loop edges)
+    if (is.na(avg_dist)) avg_dist <- Inf
+    total_profit <- sum(inst$points$score[zone], na.rm = T) # get the total profit from the instance table
+    # total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
+    #
+    # p <- .05
+    # q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
+
+    return(avg_dist/total_profit)
+  }
+
+  relevancy <- function(zone) {
+    # find the absolute correlation between points in the zone
+    # other_zone <- in_points$id[-zone]
+    if (identical(zone, c(1))) return(Inf)
+
+    other_zone <- intersect(
+      inst$points$id[-zone], # All points ids that are not the zone
+      in_points$id # Point ids that are in range
+    )
+
+    abs_info_same_zone <- sum(abs(inst$info[zone, zone]))
+    abs_info_other_zone <- sum(abs(inst$info[zone,other_zone]))
+
+    return(-abs_info_same_zone)
+  }
+
+  # wrapper for the cluster eval function to restrict to a single argument
+  cluster_eval <- function(zone) {
+    # handle the edge case that we have 0 * Inf
+    profit <- alpha*(avg_dist_profit(zone))
+    info <- (1-alpha)*(relevancy(zone))
+    if (is.na(profit) & alpha == 0) {
+      return(info)
+    }
+    # else return the weigthed sum
+    alpha*(avg_dist_profit(zone)) + (1-alpha)*(relevancy(zone))
+  }
+
+  # Check if a zone is connected
+  connected <- function(zone) {
+    # zone <- zones[[1]]
+    sub_g <- igraph::induced_subgraph(g, vids = zone)
+    igraph::is_connected(sub_g, mode = "weak") # check for undirected path between pairs of vertices
+  }
+
+  insert_eval <- function(id, zone_id, zones, check_connected = T, all_zones = T) {
+    # find where the point is coming from and remove it
+    for (i in 1:k) {
+      if (i == zone_id) next
+      if (id %in% zones[[i]]) {
+        zones[[i]] <- zones[[i]][zones[[i]] != id]
+      }
+    }
+
+    # then insert it in the new zone
+    zones[[zone_id]] <- append(
+      zones[[zone_id]],
+      id,
+      after = length(zones[[zone_id]]) - 1
+    )
+
+    # check if zones are connected
+    if (check_connected) {
+      if (!all(do.call(c, lapply(zones, connected)))) {
+        return(Inf)
+      }
+    }
+
+    if (all_zones) {
+      return(do.call(sum, lapply(zones, cluster_eval)))
+    } else {
+      return(cluster_eval(zones[[zone_id]]))
+    }
+  }
 
   g <- inst$g
   dst <- inst$dst
@@ -30,6 +111,8 @@ clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c(
 
   # Save only the intermediate points that are in range for clustering
   in_points <- inst$points |> dplyr::filter(point_type == "intermediate", in_range)
+
+  inst$info <- info
 
   greedy_clustering <- function() {
     # add the source node to each zone
@@ -59,17 +142,12 @@ clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c(
 
         nghbr <- nghbr[nghbr %in% unassigned$id] # restrict neighborhood to unly unassigned nodes
 
+
         # if there are no neighbors go to next iteration
         if (length(nghbr) < 1) next
 
-        # Lookup distances in the distance matrix, while removing loops (rows are neighbors, columns are points in zone)
-        dst_temp <- dst[nghbr, points_in_zone] |> as.matrix()
-        if (length(nghbr) == 1) dst_temp <- t(dst_temp) # If there is only one neighbor and multiple points in zone, rows and columns are switched so we transpose to keep rows as neighbors and columns as points in zone
+        closest_point <- nghbr[which.min(sapply(nghbr, function(id) insert_eval(id, i, zones, check_connected = F, all_zones = F)))]
 
-        # return the first minimum distance and add to zone
-        # first minimum distance (first column in neighbors, second column is points in zone)
-        closest_point <- nghbr[arrayInd(which.min(dst_temp), dim(dst_temp))[,1]]
-        # print(paste0("closest point is ", closest_point))
         if(is.na(closest_point)) stop("closest point is NA")
 
         zones[[i]] <- append(
@@ -112,47 +190,6 @@ clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c(
       )
     zones <- gclust$zones
 
-    avg_dist_profit <- function(zone) {
-      dst_temp <- dst[zone, zone] # subset the distance matrix (of shortest paths) to only nodes in the zone
-      avg_dist <- mean(dst_temp[lower.tri(dst_temp, diag = F)]) # dst_temp is symmetric so we only need the lower triange (or equivalently upper) not including the diagonal (of all zeroes corresponding to all loop edges)
-      if (is.na(avg_dist)) avg_dist <- Inf
-      total_profit <- sum(inst$points$score[zone], na.rm = T) # get the total profit from the instance table
-      # total_variance <- sum(inst$points$score_variance[zone], na.rm = T)
-      #
-      # p <- .05
-      # q <- qnorm(p, mean = total_profit, sd = sqrt(total_variance))
-
-      return(avg_dist/total_profit)
-    }
-
-    relevancy <- function(zone) {
-      # find the absolute correlation between points in the zone
-      # other_zone <- in_points$id[-zone]
-      if (identical(zone, c(1))) return(Inf)
-
-      other_zone <- intersect(
-        inst$points$id[-zone], # All points ids that are not the zone
-        in_points$id # Point ids that are in range
-      )
-
-      abs_info_same_zone <- sum(abs(inst$info[zone, zone]))
-      abs_info_other_zone <- sum(abs(inst$info[zone,other_zone]))
-
-      return(-abs_info_same_zone)
-    }
-
-    # wrapper for the cluster eval function to restrict to a single argument
-    cluster_eval <- function(zone) {
-      # handle the edge case that we have 0 * Inf
-      profit <- alpha*(avg_dist_profit(zone))
-      info <- (1-alpha)*(relevancy(zone))
-      if (is.na(profit) & alpha == 0) {
-        return(info)
-      }
-      # else return the weigthed sum
-      alpha*(avg_dist_profit(zone)) + (1-alpha)*(relevancy(zone))
-    }
-
     # Operators for the local search (for now there is only insertion)
     # take a point from one cluster and add it to another
     insertion <- function(zones, bks_obj) {
@@ -185,13 +222,6 @@ clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c(
       if (nrow(candidates) == 0) {
         warning("There are no candidates, maybe all points are in one zone")
         return(zones)
-      }
-
-      # Check if a zone is connected
-      connected <- function(zone) {
-        # zone <- zones[[1]]
-        sub_g <- igraph::induced_subgraph(g, vids = zone)
-        igraph::is_connected(sub_g, mode = "weak") # check for undirected path between pairs of vertices
       }
 
       # Calculate the resulting objective of performing the insertion
@@ -327,7 +357,7 @@ clustering <- function(inst, k, L, eps = 0, variances, info, cluster_method = c(
     return(
       list(
         "inst_points" = inst$points |>
-          dplyr::select(id, point_type, x, y, score, score_variance) |>
+          dplyr::select(id, point_type, x, y, score) |>
           dplyr::left_join(
             tibble::tibble(zone = 1:k, id = zones) |>
               tidyr::unnest(cols = id) |>
@@ -433,7 +463,7 @@ plot.clustering <- function(clust, delaunay = T) {
       color = "none",
       alpha = "none",
       size = "none"
-    ) + labs(x = "x", y = "y")
+    ) + ggplot2::labs(x = "x", y = "y")
 }
 
 #' Generate animation of the local search clustering approach
